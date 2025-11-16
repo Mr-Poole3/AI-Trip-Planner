@@ -161,13 +161,12 @@
         <div v-for="(message, index) in messages" :key="index" class="message-wrapper">
         <div :class="['message', message.role]">
           <div class="message-avatar">
-            <svg v-if="message.role === 'user'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
+            <svg v-if="message.role === 'user'" viewBox="0 0 1024 1024" fill="currentColor">
+              <path d="M445.781333 378.311111c-19.456 0-35.271111 15.815111-35.271111 35.271111V450.56c0 19.456 15.815111 35.271111 35.271111 35.271111s35.271111-15.815111 35.271111-35.271111v-36.977778c0-19.456-15.815111-35.271111-35.271111-35.271111zM615.879111 485.831111c19.456 0 35.271111-15.815111 35.271111-35.271111v-36.977778c0-19.456-15.815111-35.271111-35.271111-35.271111s-35.271111 15.815111-35.271111 35.271111V450.56c0 19.456 15.815111 35.271111 35.271111 35.271111z"/>
+              <path d="M791.665778 841.272889c-0.113778-1.024-0.227556-2.048-0.455111-2.958222-6.144-33.678222-22.983111-65.536-47.445334-89.543111-9.329778-9.216-19.456-16.952889-30.378666-23.210667 16.611556-11.377778 32.199111-24.348444 46.762666-38.798222 61.326222-61.326222 95.118222-142.904889 95.118223-229.717334s-33.792-168.391111-95.118223-229.717333-142.904889-95.118222-229.717333-95.118222c-86.812444 0-168.391111 33.792-229.717333 95.118222-61.326222 61.326222-95.118222 142.904889-95.118223 229.717333s33.792 168.391111 95.118223 229.717334c14.449778 14.449778 30.151111 27.420444 46.762666 38.798222-10.581333 6.257778-20.593778 13.994667-29.582222 23.096889-23.665778 24.007111-40.049778 56.775111-46.08 92.16-0.113778 0.568889-0.227556 1.251556-0.227555 1.820444L265.102222 898.844444c-2.275556 19.342222 11.605333 36.864 30.947556 39.139556 1.365333 0.113778 2.730667 0.227556 4.096 0.227556 17.635556 0 32.881778-13.198222 35.043555-31.175112l6.371556-55.296c8.988444-51.086222 44.942222-74.296889 74.638222-74.296888h1.820445l42.894222-2.275556c0.682667 0 1.251556-0.113778 1.820444-0.113778 21.959111 4.664889 44.600889 7.054222 67.584 7.054222 23.096889 0 45.738667-2.389333 67.811556-7.054222 0.682667 0.113778 1.365333 0.113778 2.161778 0.227556l42.439111 2.275555h1.820444c39.253333 0 69.632 36.522667 76.8 72.362667l5.347556 56.433778c1.706667 18.204444 17.066667 31.971556 35.043555 31.971555 1.137778 0 2.275556 0 3.413334-0.113777 19.342222-1.820444 33.678222-19.000889 31.744-38.456889l-5.233778-58.481778zM472.177778 706.901333c-2.730667-1.137778-5.688889-1.820444-8.760889-2.161777-42.780444-11.491556-82.033778-34.133333-114.232889-66.332445-48.469333-48.469333-75.207111-112.867556-75.207111-181.475555s26.737778-133.006222 75.207111-181.475556S462.051556 200.248889 530.659556 200.248889s133.006222 26.737778 181.475555 75.207111c48.469333 48.469333 75.207111 112.867556 75.207111 181.475556S760.490667 589.937778 712.021333 638.293333c-32.312889 32.312889-71.68 54.954667-114.688 66.446223-2.389333 0.341333-4.778667 0.910222-7.054222 1.820444-19.342222 4.551111-39.367111 6.940444-59.733333 6.940444-19.911111 0-39.480889-2.275556-58.368-6.599111z"/>
             </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="10" rx="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            <svg v-else viewBox="0 0 1024 1024" fill="currentColor">
+              <path d="M850.367451 513.489934c4.208858-5.538133 8.271384-11.088546 12.139481-16.651238 55.695486-80.095199 69.303412-153.764036 38.315654-207.435423-30.986735-53.671387-101.583606-78.719876-198.802812-70.535473-6.750751 0.568958-13.588483 1.310855-20.488637 2.187829-2.691295-6.414083-5.467525-12.70844-8.350179-18.838044-41.517579-88.280626-98.512664-136.898927-160.487158-136.898927-61.974493 0-118.969579 48.618301-160.485111 136.898927-2.883677 6.130627-5.658883 12.423961-8.350179 18.839067-6.901177-0.876973-13.739932-1.61887-20.490683-2.187829-97.209996-8.18645-167.813007 16.865109-198.800765 70.535473-30.987758 53.671387-17.380856 127.340223 38.314631 207.435423 3.867074 5.561669 7.9296 11.113105 12.139481 16.651238-4.209882 5.538133-8.271384 11.088546-12.139481 16.651238-55.694463 80.095199-69.301366 153.764036-38.314631 207.434399 27.13808 47.004547 84.658122 72.055083 163.830299 72.055083 11.228739 0 22.897499-0.50449 34.970466-1.51961 6.750751-0.568958 13.589506-1.310855 20.490683-2.187829 2.691295 6.414083 5.467525 12.70844 8.351202 18.839067 41.515532 88.281649 98.510618 136.89995 160.485111 136.89995 61.974493 0 118.969579-48.618301 160.487158-136.89995 2.883677-6.130627 5.658883-12.423961 8.350179-18.839067 6.900154 0.876973 13.737886 1.61887 20.488637 2.187829 12.081153 1.01819 23.737634 1.51961 34.972513 1.51961 79.162968 0 136.693242-25.052582 163.830299-72.055083 30.986735-53.670363 17.379832-127.3392-38.315654-207.434399C858.639858 524.579503 854.577333 519.028067 850.367451 513.489934zM705.378266 258.742972c79.704296-6.715959 138.322345 11.755742 160.790056 50.669006 22.467711 38.914288 9.157567 98.901521-36.513612 164.583452-1.775436 2.554172-3.603061 5.106298-5.459339 7.656377-27.969005-31.598672-61.164035-62.346977-98.369402-91.212398-6.39464-46.653553-16.426111-90.774423-29.806863-130.796952C699.155541 259.309884 702.278671 259.003915 705.378266 258.742972zM603.368964 670.542876c-30.015617 17.32969-60.426231 32.621978-90.675162 45.690622-30.248931-13.068643-60.659545-28.360931-90.675162-45.690622-30.015617-17.32969-58.46353-36.019355-84.905762-55.680137-3.805676-32.730449-5.767354-66.712401-5.767354-101.371782 0-34.659381 1.961678-68.64338 5.768377-101.373829 26.442232-19.660782 54.890144-38.350446 84.904739-55.680137 30.015617-17.32969 60.427254-32.621978 90.675162-45.690622 30.248931 13.068643 60.658522 28.360931 90.675162 45.690622 30.016641 17.32969 58.464553 36.020378 84.907809 55.68116 3.805676 32.730449 5.768377 66.713424 5.768377 101.372805 0 34.659381-1.961678 68.641333-5.767354 101.370759C661.833517 634.522498 633.385605 653.213185 603.368964 670.542876zM679.918407 669.814282c-6.14393 32.457226-14.217816 63.196321-24.11728 91.542926-29.498848-5.600555-60.157101-13.977339-91.338265-24.885783 19.729344-9.582239 39.413662-20.017916 58.912761-31.275307C642.875746 693.938726 661.755746 682.109306 679.918407 669.814282zM460.924741 736.471424c-31.181163 10.908444-61.839417 19.285229-91.337241 24.885783-9.898441-28.346605-17.972327-59.0857-24.116257-91.541903 18.162662 12.295024 37.041638 24.12342 56.539714 35.380812C421.510056 716.454532 441.194374 726.889185 460.924741 736.471424zM293.701159 580.147076c-25.037233-21.548782-47.620577-43.911092-67.219961-66.657142 19.599384-22.74605 42.183751-45.108361 67.219961-66.658166-1.566682 21.877263-2.371 44.142359-2.371 66.658166C291.330158 536.00574 292.134477 558.269813 293.701159 580.147076zM345.471242 357.163539c6.14393-32.457226 14.217816-63.195298 24.116257-91.541903 29.497824 5.600555 60.156078 13.977339 91.336218 24.885783-19.729344 9.582239-39.413662 20.016893-58.912761 31.275307C382.511857 333.040119 363.633904 344.868515 345.471242 357.163539zM564.463885 290.50742c31.18014-10.907421 61.838394-19.284205 91.337241-24.885783 9.898441 28.346605 17.97335 59.0857 24.11728 91.542926-18.162662-12.295024-37.042661-24.124444-56.541761-35.381835C603.877547 310.524313 584.193229 300.088636 564.463885 290.50742zM731.688491 446.832791c25.036209 21.548782 47.620577 43.911092 67.219961 66.657142-19.599384 22.745027-42.182728 45.107337-67.219961 66.656119 1.566682-21.87624 2.371-44.141336 2.371-66.656119C734.059492 490.974128 733.255173 468.710055 731.688491 446.832791zM388.417357 219.247446c34.046421-72.393797 79.343069-113.913423 124.276445-113.913423s90.230024 41.519626 124.275421 113.913423c1.324158 2.815115 2.619664 5.67321 3.900843 8.55484-41.349757 8.422833-84.576257 21.796422-128.176264 39.584554-43.600007-17.788132-86.826508-31.16172-128.176264-39.584554C385.798716 224.919632 387.094222 222.061538 388.417357 219.247446zM195.73494 473.994408c-45.672202-65.680908-58.980299-125.669164-36.513612-164.583452 19.435655-33.662681 65.900919-52.022841 129.693828-52.022841 9.952676 0 20.338211 0.447185 31.096229 1.353834 3.099594 0.260943 6.222725 0.567935 9.359158 0.899486-13.379729 40.021505-23.411199 84.142375-29.806863 130.794905-37.205367 28.865421-70.400397 59.613726-98.370425 91.213421C199.338001 479.099682 197.510376 476.54858 195.73494 473.994408zM320.010361 768.235872c-79.70839 6.711865-138.322345-11.754718-160.790056-50.667983-22.466688-38.913265-9.157567-98.902544 36.513612-164.582429 1.775436-2.554172 3.603061-5.105275 5.458315-7.655354 27.970028 31.598672 61.165058 62.346977 98.370425 91.211375 6.39464 46.65253 16.426111 90.7734 29.806863 130.794905C326.234109 767.667937 323.109955 767.974929 320.010361 768.235872zM636.969223 807.733445c-34.046421 72.392774-79.343069 113.912399-124.275421 113.912399s-90.230024-41.519626-124.276445-113.912399c-1.324158-2.815115-2.620687-5.674233-3.900843-8.556886 41.35078-8.422833 84.577281-21.797445 128.177288-39.585577 43.601031 17.788132 86.827531 31.16172 128.177288 39.584554C639.58991 802.059212 638.293381 804.918329 636.969223 807.733445zM866.168322 717.567889c-22.467711 38.913265-81.075527 57.387012-160.790056 50.667983-3.099594-0.260943-6.222725-0.567935-9.359158-0.899486 13.380752-40.021505 23.412223-84.143399 29.806863-130.795928 37.205367-28.864398 70.399373-59.612703 98.369402-91.210351 1.855254 2.550079 3.682879 5.102205 5.459339 7.656377C875.325889 618.667392 888.633986 678.654624 866.168322 717.567889z"/>
             </svg>
           </div>
           <div class="message-content">
@@ -417,6 +416,10 @@ interface TravelPlanDraft {
 const travelPlanDraft = ref<TravelPlanDraft | null>(null)
 // DRAFT_STORAGE_KEY 已废弃：草稿现在跟会话绑定，存储在 ChatSession.draft 中
 
+// 🆕 当前激活的旅行计划（用于修改）
+const currentActivePlan = ref<any>(null)
+const currentActivePlanMessageIndex = ref<number | null>(null)
+
 // 草稿模式计算属性
 const isDraftMode = computed(() => travelPlanDraft.value !== null)
 const draftCompleteness = computed(() => {
@@ -456,6 +459,8 @@ interface ChatSession {
   createdAt: number
   updatedAt: number
   draft?: TravelPlanDraft | null  // 🆕 每个会话独立的草稿
+  currentPlan?: any  // 🆕 当前激活的旅行计划（用于修改）
+  currentPlanMsgIndex?: number | null  // 🆕 当前计划所在的消息索引
 }
 
 const canSend = computed(() => {
@@ -597,8 +602,8 @@ const sendMessage = async () => {
       travelStepMsgMap.value[1] = messages.value.length - 1
       await scrollToBottom()
 
-      // 智能启动草稿模式
-      if (!isDraftMode.value && isTravelRelated(userText)) {
+      // 智能启动草稿模式（🆕 但如果已有激活计划，则跳过）
+      if (!isDraftMode.value && !currentActivePlan.value && isTravelRelated(userText)) {
         // 第一次旅行相关输入，初始化草稿
         initDraft()
       }
@@ -608,7 +613,9 @@ const sendMessage = async () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: original,
-          travel_draft: travelPlanDraft.value || undefined,  // 发送草稿信息
+          // 🆕 优先级：有激活计划时，不发送草稿（避免触发需求收集）
+          travel_draft: currentActivePlan.value ? undefined : (travelPlanDraft.value || undefined),
+          current_plan: currentActivePlan.value || undefined,  // 🆕 发送当前激活的计划
           system_prompt: (() => {
             const fmt = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
             const s = fmt.format(new Date()).replace(/\//g, '-')
@@ -687,6 +694,11 @@ const sendMessage = async () => {
             }
 
             const msgIndex = messages.value.length - 1
+
+            // 🆕 保存当前激活的计划
+            currentActivePlan.value = planResult
+            currentActivePlanMessageIndex.value = msgIndex
+
             const city = planResult?.plan?.destination || ''
             const itinerary = planResult?.itinerary || []
 
@@ -726,14 +738,41 @@ const sendMessage = async () => {
       }
 
       if (result.type === 'daily_plan_json') {
-        messages.value.push({ role: 'assistant', content: [], travelSteps: [{ step: 2, status: 'running', message: '正在生成每日计划...' }] })
-        const html = buildDailyPlanHtml(result)
-        messages.value.push({ role: 'assistant', content: [{ type: 'html', text: html }] })
-        const idx2 = messages.value.length - 2
-        messages.value[idx2].travelSteps = [{ step: 2, status: 'completed', message: '每日计划生成完成' }]
-        messages.value[idx2] = { ...messages.value[idx2] }
+        // 🆕 检查是否是修改现有计划
+        const isModification = currentActivePlan.value !== null
 
-        const msgIndex = messages.value.length - 1
+        if (!isModification) {
+          // 新生成计划，添加步骤提示
+          messages.value.push({ role: 'assistant', content: [], travelSteps: [{ step: 2, status: 'running', message: '正在生成每日计划...' }] })
+        }
+
+        const html = buildDailyPlanHtml(result)
+
+        let msgIndex: number
+
+        if (isModification && currentActivePlanMessageIndex.value !== null) {
+          // 🆕 修改模式：替换现有计划消息
+          msgIndex = currentActivePlanMessageIndex.value
+          messages.value[msgIndex].content = [{ type: 'html', text: html }]
+          messages.value[msgIndex] = { ...messages.value[msgIndex] }
+
+          // 添加修改成功提示
+          messages.value.push({
+            role: 'assistant',
+            content: [{ type: 'text', text: '✅ 已根据您的要求修改计划！' }]
+          })
+        } else {
+          // 新生成模式：添加新消息
+          messages.value.push({ role: 'assistant', content: [{ type: 'html', text: html }] })
+          const idx2 = messages.value.length - 2
+          messages.value[idx2].travelSteps = [{ step: 2, status: 'completed', message: '每日计划生成完成' }]
+          messages.value[idx2] = { ...messages.value[idx2] }
+          msgIndex = messages.value.length - 1
+        }
+
+        // 🆕 保存当前激活的计划
+        currentActivePlan.value = result
+        currentActivePlanMessageIndex.value = msgIndex
         // 🆕 优先使用LLM识别的城市名，降级使用destination（绝不能为空）
         const city = result?.plan?.city || result?.plan?.destination
         const itinerary = result?.itinerary || []
@@ -744,17 +783,46 @@ const sendMessage = async () => {
 
         console.log(`🏙️ 城市信息: ${city} (来源: ${result?.plan?.city ? 'LLM识别' : 'destination降级'})`)
 
+        // 🆕 如果是修改模式，需要清除旧地图并滚动到计划位置
+        if (isModification) {
+          console.log('🔄 修改模式：准备重新渲染地图')
+          // 等待DOM更新后滚动到计划位置
+          await nextTick()
+          const planMessage = document.querySelectorAll('.message')[msgIndex]
+          if (planMessage) {
+            planMessage.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        }
+
         // 优化：先获取坐标，再复用坐标（避免重复地理编码）
         renderTravelMap(msgIndex, itinerary, city || '未知城市').then(coordsMap => {
           // 使用已获取的坐标映射来计算路线，避免重复请求地理编码
           return populateRoutesForMessage(msgIndex, city || '未知城市', coordsMap)
         }).then(() => {
-          // 计划生成完成，重置草稿
-          resetDraft()
+          // 计划生成完成，重置草稿（仅在非修改模式下）
+          if (!isModification) {
+            resetDraft()
+          }
           saveCurrentSession()
+
+          // 🆕 修改模式下，重新绑定标签页切换事件
+          if (isModification) {
+            console.log('✅ 地图重新渲染完成，重新绑定标签页事件')
+            nextTick(() => {
+              // 从DOM中获取更新后的mapId
+              const planMessage = document.querySelectorAll('.message')[msgIndex]
+              const dailyPlanDiv = planMessage?.querySelector('.daily-plan[data-map-id]')
+              const updatedMapId = dailyPlanDiv?.getAttribute('data-map-id')
+              if (updatedMapId) {
+                bindTabSwitchEvents(updatedMapId)
+              }
+            })
+          }
         }).catch(err => {
           console.error('渲染失败:', err)
-          resetDraft()
+          if (!isModification) {
+            resetDraft()
+          }
           saveCurrentSession()
         })
 
@@ -782,7 +850,10 @@ const sendMessage = async () => {
       const response = await fetch('http://localhost:9000/api/hotel-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: (content.find(c => c.type === 'text')?.text) || '' })
+        body: JSON.stringify({
+          message: (content.find(c => c.type === 'text')?.text) || '',
+          travel_plan: currentActivePlan.value || undefined  // 🆕 发送当前激活的旅行计划
+        })
       })
       if (!response.ok) throw new Error('酒店搜索失败')
       const reader = response.body?.getReader()
@@ -972,6 +1043,13 @@ const loadChatSession = async (session: ChatSession) => {
   travelPlanDraft.value = session.draft || null
   console.log(`📋 加载会话 ${session.id} 的草稿:`, travelPlanDraft.value)
 
+  // 🆕 恢复当前激活的计划
+  currentActivePlan.value = session.currentPlan || null
+  currentActivePlanMessageIndex.value = session.currentPlanMsgIndex ?? null
+  if (currentActivePlan.value) {
+    console.log(`📍 恢复会话 ${session.id} 的激活计划，索引: ${currentActivePlanMessageIndex.value}`)
+  }
+
   await nextTick()
 
   // 🔄 重新渲染缓存的地图
@@ -1093,7 +1171,9 @@ const saveCurrentSession = () => {
     messages: [...messages.value],
     createdAt: existingIndex === -1 ? Date.now() : chatSessions.value[existingIndex].createdAt,
     updatedAt: Date.now(),
-    draft: travelPlanDraft.value  // 💾 保存当前会话的草稿
+    draft: travelPlanDraft.value,  // 💾 保存当前会话的草稿
+    currentPlan: currentActivePlan.value,  // 🆕 保存当前激活的计划
+    currentPlanMsgIndex: currentActivePlanMessageIndex.value  // 🆕 保存计划消息索引
   }
 
   if (existingIndex === -1) {
@@ -1148,8 +1228,22 @@ const buildDailyPlanHtml = (data: any) => {
     const notes = data?.notes
     const mapId = `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-    let html = `<div class="daily-plan">`
-    html += `<div class="plan-header"><div class="plan-title">每日行程</div><div class="plan-meta">出发地：${plan.origin || '-'} ｜ 目的地：${plan.destination || '-'} ｜ 日期：${plan.start_date || '-'} 至 ${plan.end_date || '-'}</div></div>`
+    // 定义每天的颜色（与地图颜色一致）
+    const dayColors = [
+      '#FF6B6B', // Day 1: 红色
+      '#4ECDC4', // Day 2: 青色
+      '#FFE66D', // Day 3: 黄色
+      '#95E1D3', // Day 4: 绿色
+      '#A8E6CF', // Day 5: 浅绿
+      '#FFD3B6', // Day 6: 橙色
+      '#FFAAA5', // Day 7: 粉色
+    ]
+
+    let html = `<div class="daily-plan" data-map-id="${mapId}">`
+    html += `<div class="plan-header">
+      <div class="plan-title">每日行程</div>
+      <div class="plan-meta">出发地：${plan.origin || '-'} ｜ 目的地：${plan.destination || '-'} ｜ 日期：${plan.start_date || '-'} 至 ${plan.end_date || '-'}</div>
+    </div>`
 
     // 添加地图容器
     html += `<div class="map-container">
@@ -1162,12 +1256,43 @@ const buildDailyPlanHtml = (data: any) => {
         <span class="map-status" data-map-id="${mapId}">加载中...</span>
       </div>
       <div id="${mapId}" class="travel-map" data-map-id="${mapId}"></div>
+      <div class="map-legend">
+        ${itinerary.map((day: any) => {
+          const dayColor = dayColors[(day.day - 1) % dayColors.length]
+          return `<div class="legend-item">
+            <div class="legend-color" style="background: ${dayColor};"></div>
+            <span class="legend-text">Day ${day.day}</span>
+          </div>`
+        }).join('')}
+      </div>
     </div>`
 
-    // 行程卡片容器
+    // Tab导航栏
+    html += `<div class="itinerary-tabs">
+      <button class="tab-btn active" data-tab="all" data-map-id="${mapId}">
+        <span class="tab-icon">📋</span>
+        <span>总览</span>
+      </button>`
+
+    for (const day of itinerary) {
+      const dayColor = dayColors[(day.day - 1) % dayColors.length]
+      html += `<button class="tab-btn" data-tab="day-${day.day}" data-day="${day.day}" data-map-id="${mapId}" style="--tab-color: ${dayColor};">
+        <span class="tab-icon">📍</span>
+        <span>Day ${day.day}</span>
+      </button>`
+    }
+    html += `</div>`
+
+    // Tab内容区域
+    html += `<div class="tab-content-wrapper">`
+
+    // 总览Tab内容
+    html += `<div class="tab-content active" data-content="all">`
     html += `<div class="itinerary-container">`
     for (const day of itinerary) {
-      html += `<div class="day-card" data-day="${day.day}"><div class="day-title">${day.title || `Day ${day.day}`}（${day.date || ''}）</div>`
+      const dayColor = dayColors[(day.day - 1) % dayColors.length]
+      html += `<div class="day-card" data-day="${day.day}" style="--day-color: ${dayColor}; border-left: 4px solid ${dayColor};">
+        <div class="day-title" style="color: ${dayColor};">${day.title || `Day ${day.day}`}（${day.date || ''}）</div>`
       if (Array.isArray(day.activities) && day.activities.length) {
         html += `<ul class="activities">`
         for (let i = 0; i < day.activities.length; i++) {
@@ -1208,12 +1333,68 @@ const buildDailyPlanHtml = (data: any) => {
       }
       html += `</div>`
     }
-    html += `</div>` // 关闭 itinerary-container
+    html += `</div>` // 关闭 itinerary-container (总览)
+    html += `</div>` // 关闭总览 tab-content
+
+    // 每一天的详细Tab内容
+    for (const day of itinerary) {
+      const dayColor = dayColors[(day.day - 1) % dayColors.length]
+      html += `<div class="tab-content" data-content="day-${day.day}">`
+      html += `<div class="day-detail-card" style="--day-color: ${dayColor};">
+        <div class="day-detail-header" style="background: linear-gradient(135deg, ${dayColor} 0%, color-mix(in srgb, ${dayColor} 80%, black) 100%);">
+          <h3>${day.title || `Day ${day.day}`}</h3>
+          <p>${day.date || ''}</p>
+        </div>`
+
+      if (Array.isArray(day.activities) && day.activities.length) {
+        html += `<ul class="activities-detail">`
+        for (let i = 0; i < day.activities.length; i++) {
+          const act = day.activities[i]
+          const actName = String(act?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          html += `<li class="activity-detail" data-spot="${actName}">
+            <div class="activity-number" style="background: ${dayColor};">${i + 1}</div>
+            <div class="activity-info">
+              <div class="activity-name">${act.name || ''}</div>
+              ${act.notes ? `<div class="activity-notes">${act.notes}</div>` : ''}
+            </div>
+          </li>`
+
+          if (i < day.activities.length - 1) {
+            const next = day.activities[i + 1]
+            const o = String(act?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const d = String(next?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const c = String(plan.city || plan.destination || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const routeId = `route-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            html += `
+              <li class="route-container-detail">
+                <button class="route-chip" data-route-id="${routeId}" data-origin="${o}" data-destination="${d}" data-city="${c}">
+                  <span class="route-icon">🚗</span>
+                  <span class="route-text">计算中...</span>
+                  <span class="expand-icon">▼</span>
+                </button>
+                <div class="route-details" id="${routeId}" style="display: none;">
+                  <div class="route-loading">加载中...</div>
+                </div>
+              </li>`
+          }
+        }
+        html += `</ul>`
+      }
+
+      if (day.summary) {
+        html += `<div class="day-detail-summary">${day.summary}</div>`
+      }
+
+      html += `</div>` // 关闭 day-detail-card
+      html += `</div>` // 关闭单天 tab-content
+    }
+
+    html += `</div>` // 关闭 tab-content-wrapper
 
     if (notes) {
       html += `<div class="plan-notes">${notes}</div>`
     }
-    html += `</div>`
+    html += `</div>` // 关闭 daily-plan
     return html
   } catch {
     return '行程解析失败'
@@ -1254,6 +1435,8 @@ const buildDailyPlanPreview = (buffer: string) => {
 
 // 地图实例存储
 const travelMaps = new Map<string, any>()
+// 地图数据存储（用于Tab切换时过滤显示）
+const travelMapData = new Map<string, { itinerary: any[], coordsMap: Map<string, number[]>, daySpots: any[] }>()
 
 // 定义每天的路线颜色
 const DAY_COLORS = [
@@ -1352,7 +1535,8 @@ const renderTravelMap = async (msgIndex: number, itinerary: any[], city: string)
     const map = new AMap.Map(mapId, {
       zoom: 12,
       center: [centerLng, centerLat],
-      viewMode: '2D'
+      viewMode: '2D',
+      mapStyle: 'amap://styles/light'  // 使用浅色地图
     })
 
     // 保存地图实例
@@ -1366,16 +1550,31 @@ const renderTravelMap = async (msgIndex: number, itinerary: any[], city: string)
 
       if (dayCoords.length === 0) continue
 
-      // 绘制路线
+      // 绘制路线 - 双层描边效果
       if (dayCoords.length > 1) {
+        // 第一层：白色描边（粗线）
+        // @ts-ignore
+        const outlinePolyline = new AMap.Polyline({
+          path: dayCoords,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 8,
+          strokeOpacity: 0.9,
+          lineJoin: 'round',
+          lineCap: 'round',
+          zIndex: 10
+        })
+        map.add(outlinePolyline)
+
+        // 第二层：彩色实线（细线）
         // @ts-ignore
         const polyline = new AMap.Polyline({
           path: dayCoords,
           strokeColor: dayInfo.color,
-          strokeWeight: 4,
-          strokeOpacity: 0.8,
+          strokeWeight: 5,
+          strokeOpacity: 1,
           lineJoin: 'round',
-          lineCap: 'round'
+          lineCap: 'round',
+          zIndex: 11
         })
         map.add(polyline)
       }
@@ -1390,9 +1589,12 @@ const renderTravelMap = async (msgIndex: number, itinerary: any[], city: string)
           position: coords,
           title: spotName,
           label: {
-            content: `<div style="background: ${dayInfo.color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${index + 1}</div>`,
+            content: `<div style="display: flex; align-items: center; gap: 6px;">
+              <div style="background: ${dayInfo.color}; color: white; padding: 6px 10px; border-radius: 16px; font-size: 13px; font-weight: bold; box-shadow: 0 3px 8px rgba(0,0,0,0.25); border: 2px solid white;">${index + 1}</div>
+              <div style="background: rgba(255,255,255,0.95); color: ${dayInfo.color}; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">Day ${dayInfo.day}</div>
+            </div>`,
             direction: 'top',
-            offset: [0, -5]
+            offset: [0, -10]
           }
         })
 
@@ -1401,7 +1603,7 @@ const renderTravelMap = async (msgIndex: number, itinerary: any[], city: string)
         marker.on('click', () => {
           // @ts-ignore
           const infoWindow = new AMap.InfoWindow({
-            content: `<div style="padding: 8px;"><h4 style="margin: 0 0 4px 0;">${spotName}</h4><p style="margin: 0; color: #666; font-size: 12px;">Day ${dayInfo.day}</p></div>`
+            content: `<div style="padding: 10px;"><h4 style="margin: 0 0 6px 0; color: ${dayInfo.color};">${spotName}</h4><p style="margin: 0; color: #666; font-size: 13px; font-weight: 500;">Day ${dayInfo.day} - 第 ${index + 1} 站</p></div>`
           })
           infoWindow.open(map, coords)
         })
@@ -1434,12 +1636,151 @@ const renderTravelMap = async (msgIndex: number, itinerary: any[], city: string)
       console.log(`✅ 地图数据已缓存到消息 ${msgIndex}`)
     }
 
+    // 💾 保存地图数据用于Tab切换过滤
+    travelMapData.set(mapId, { itinerary, coordsMap, daySpots })
+
+    // 🎯 绑定Tab切换事件
+    bindTabSwitchEvents(mapId)
+
     return coordsMap
   } catch (error) {
     console.error('渲染地图失败:', error)
     if (mapStatus) mapStatus.textContent = '渲染失败'
     return coordsMap
   }
+}
+
+// 🎯 绑定Tab切换事件
+const bindTabSwitchEvents = (mapId: string) => {
+  nextTick(() => {
+    const dailyPlan = document.querySelector(`.daily-plan[data-map-id="${mapId}"]`)
+    if (!dailyPlan) return
+
+    const tabBtns = dailyPlan.querySelectorAll('.tab-btn')
+    const tabContents = dailyPlan.querySelectorAll('.tab-content')
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', function(this: HTMLElement) {
+        const tabName = this.getAttribute('data-tab')
+        const dayNum = this.getAttribute('data-day')
+
+        // 切换Tab按钮的激活状态
+        tabBtns.forEach(b => b.classList.remove('active'))
+        this.classList.add('active')
+
+        // 切换Tab内容的显示
+        tabContents.forEach(content => {
+          const contentName = content.getAttribute('data-content')
+          if (contentName === tabName) {
+            content.classList.add('active')
+          } else {
+            content.classList.remove('active')
+          }
+        })
+
+        // 过滤地图显示
+        if (tabName === 'all') {
+          filterMapByDay(mapId, null) // 显示所有天数
+        } else if (dayNum) {
+          filterMapByDay(mapId, parseInt(dayNum)) // 只显示指定天数
+        }
+      })
+    })
+
+    console.log(`✅ Tab切换事件已绑定到地图 ${mapId}`)
+  })
+}
+
+// 🗺️ 按天数过滤地图显示
+const filterMapByDay = (mapId: string, dayNum: number | null) => {
+  const map = travelMaps.get(mapId)
+  const mapData = travelMapData.get(mapId)
+
+  if (!map || !mapData) {
+    console.warn(`⚠️ 地图数据未找到: ${mapId}`)
+    return
+  }
+
+  const { daySpots, coordsMap } = mapData
+
+  // 清除所有现有的覆盖物
+  map.clearMap()
+
+  // 根据dayNum过滤要显示的天数
+  const filteredDaySpots = dayNum === null
+    ? daySpots
+    : daySpots.filter((ds: any) => ds.day === dayNum)
+
+  // 重新绘制过滤后的路线和标记
+  for (const dayInfo of filteredDaySpots) {
+    const dayCoords = dayInfo.spots
+      .map((spot: string) => coordsMap.get(spot))
+      .filter((coords: any): coords is number[] => coords !== undefined)
+
+    if (dayCoords.length === 0) continue
+
+    // 绘制路线 - 双层描边效果
+    if (dayCoords.length > 1) {
+      // @ts-ignore
+      const outlinePolyline = new AMap.Polyline({
+        path: dayCoords,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 8,
+        strokeOpacity: 0.9,
+        lineJoin: 'round',
+        lineCap: 'round',
+        zIndex: 10
+      })
+      map.add(outlinePolyline)
+
+      // @ts-ignore
+      const polyline = new AMap.Polyline({
+        path: dayCoords,
+        strokeColor: dayInfo.color,
+        strokeWeight: 5,
+        strokeOpacity: 1,
+        lineJoin: 'round',
+        lineCap: 'round',
+        zIndex: 11
+      })
+      map.add(polyline)
+    }
+
+    // 绘制标记
+    dayInfo.spots.forEach((spotName: string, index: number) => {
+      const coords = coordsMap.get(spotName)
+      if (!coords) return
+
+      // @ts-ignore
+      const marker = new AMap.Marker({
+        position: coords,
+        title: spotName,
+        label: {
+          content: `<div style="display: flex; align-items: center; gap: 6px;">
+            <div style="background: ${dayInfo.color}; color: white; padding: 6px 10px; border-radius: 16px; font-size: 13px; font-weight: bold; box-shadow: 0 3px 8px rgba(0,0,0,0.25); border: 2px solid white;">${index + 1}</div>
+            <div style="background: rgba(255,255,255,0.95); color: ${dayInfo.color}; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">Day ${dayInfo.day}</div>
+          </div>`,
+          direction: 'top',
+          offset: [0, -10]
+        }
+      })
+
+      // @ts-ignore
+      marker.on('click', () => {
+        // @ts-ignore
+        const infoWindow = new AMap.InfoWindow({
+          content: `<div style="padding: 10px;"><h4 style="margin: 0 0 6px 0; color: ${dayInfo.color};">${spotName}</h4><p style="margin: 0; color: #666; font-size: 13px; font-weight: 500;">Day ${dayInfo.day} - 第 ${index + 1} 站</p></div>`
+        })
+        infoWindow.open(map, coords)
+      })
+
+      map.add(marker)
+    })
+  }
+
+  // 自动调整视野
+  map.setFitView()
+  console.log(`🗺️ 地图已过滤显示: ${dayNum === null ? '所有天数' : `Day ${dayNum}`}`)
 }
 
 // 🔄 重新渲染缓存的地图
@@ -1497,18 +1838,19 @@ const rerenderCachedMaps = async () => {
         const map = new AMap.Map(mapId, {
           zoom: 12,
           center: [centerLng, centerLat],
-          viewMode: '2D'
+          viewMode: '2D',
+          mapStyle: 'amap://styles/light'  // 使用浅色地图
         })
 
         // 保存地图实例
         travelMaps.set(mapId, map)
 
         // 绘制每天的路线和标记
-        const daySpots: Array<{ day: number; spots: string[]; color: string }> = []
+        const rerenderDaySpots: Array<{ day: number; spots: string[]; color: string }> = []
         for (const day of itinerary) {
           if (Array.isArray(day.activities) && day.activities.length) {
             const spots = day.activities.map((act: any) => act.name).filter((name: string) => name)
-            daySpots.push({
+            rerenderDaySpots.push({
               day: day.day,
               spots,
               color: DAY_COLORS[(day.day - 1) % DAY_COLORS.length]
@@ -1516,22 +1858,38 @@ const rerenderCachedMaps = async () => {
           }
         }
 
-        for (const dayInfo of daySpots) {
+        for (const dayInfo of rerenderDaySpots) {
           const dayCoords = dayInfo.spots
             .map(spot => coordsMap.get(spot))
             .filter((coords): coords is number[] => coords !== undefined)
 
           if (dayCoords.length === 0) continue
 
-          // 绘制路线
+          // 绘制路线 - 双层描边效果
           if (dayCoords.length > 1) {
+            // 第一层：白色描边（粗线）
+            // @ts-ignore
+            const outlinePolyline = new AMap.Polyline({
+              path: dayCoords,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 8,
+              strokeOpacity: 0.9,
+              lineJoin: 'round',
+              lineCap: 'round',
+              zIndex: 10
+            })
+            map.add(outlinePolyline)
+
+            // 第二层：彩色实线（细线）
             // @ts-ignore
             const polyline = new AMap.Polyline({
               path: dayCoords,
               strokeColor: dayInfo.color,
-              strokeWeight: 4,
-              strokeOpacity: 0.7,
-              lineJoin: 'round'
+              strokeWeight: 5,
+              strokeOpacity: 1,
+              lineJoin: 'round',
+              lineCap: 'round',
+              zIndex: 11
             })
             map.add(polyline)
           }
@@ -1546,9 +1904,12 @@ const rerenderCachedMaps = async () => {
               position: coords,
               title: spotName,
               label: {
-                content: `<div style="background: ${dayInfo.color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${index + 1}</div>`,
+                content: `<div style="display: flex; align-items: center; gap: 6px;">
+                  <div style="background: ${dayInfo.color}; color: white; padding: 6px 10px; border-radius: 16px; font-size: 13px; font-weight: bold; box-shadow: 0 3px 8px rgba(0,0,0,0.25); border: 2px solid white;">${index + 1}</div>
+                  <div style="background: rgba(255,255,255,0.95); color: ${dayInfo.color}; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">Day ${dayInfo.day}</div>
+                </div>`,
                 direction: 'top',
-                offset: [0, -5]
+                offset: [0, -10]
               }
             })
 
@@ -1556,7 +1917,7 @@ const rerenderCachedMaps = async () => {
             marker.on('click', () => {
               // @ts-ignore
               const infoWindow = new AMap.InfoWindow({
-                content: `<div style="padding: 8px;"><h4 style="margin: 0 0 4px 0;">${spotName}</h4><p style="margin: 0; color: #666; font-size: 12px;">Day ${dayInfo.day}</p></div>`
+                content: `<div style="padding: 10px;"><h4 style="margin: 0 0 6px 0; color: ${dayInfo.color};">${spotName}</h4><p style="margin: 0; color: #666; font-size: 13px; font-weight: 500;">Day ${dayInfo.day} - 第 ${index + 1} 站</p></div>`
               })
               infoWindow.open(map, coords)
             })
@@ -1568,6 +1929,23 @@ const rerenderCachedMaps = async () => {
         map.setFitView()
         if (mapStatus) mapStatus.textContent = '✓ 已恢复'
         console.log(`✅ 地图 ${msgIndex} 重新渲染完成`)
+
+        // 💾 保存地图数据用于Tab切换
+        const cachedDaySpots: Array<{ day: number; spots: string[]; color: string }> = []
+        for (const day of itinerary) {
+          if (Array.isArray(day.activities) && day.activities.length) {
+            const spots = day.activities.map((act: any) => act.name).filter((name: string) => name)
+            cachedDaySpots.push({
+              day: day.day,
+              spots,
+              color: DAY_COLORS[(day.day - 1) % DAY_COLORS.length]
+            })
+          }
+        }
+        travelMapData.set(mapId, { itinerary, coordsMap, daySpots: cachedDaySpots })
+
+        // 🎯 重新绑定Tab切换事件
+        bindTabSwitchEvents(mapId)
 
       } catch (error) {
         console.error(`❌ 地图 ${msgIndex} 重新渲染失败:`, error)
@@ -2001,11 +2379,12 @@ onMounted(async () => {
   position: absolute;
   left: 10px;
   top: 18px;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #1a73e8;
-  box-shadow: 0 0 0 3px #E8F0FE;
+  background: var(--day-color, #1a73e8);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--day-color, #1a73e8) 20%, white);
+  border: 2px solid white;
 }
 .message-html :deep(.day-card:not(:last-child)::after) {
   content: '';
@@ -2013,14 +2392,17 @@ onMounted(async () => {
   left: 14px;
   top: 28px;
   bottom: -14px;
-  width: 2px;
-  background: #E8F0FE;
+  width: 3px;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--day-color, #E8F0FE) 30%, white),
+    color-mix(in srgb, var(--day-color, #E8F0FE) 10%, white));
+  border-radius: 2px;
 }
 .message-html :deep(.skeleton) { opacity: 0.7 }
 .message-html :deep(.day-title) {
   font-weight: 600;
   margin-bottom: 8px;
-  color: #202124;
+  font-size: 16px;
 }
 .message-html :deep(.activities) {
   list-style: none;
@@ -2345,12 +2727,228 @@ onMounted(async () => {
   position: relative;
 }
 
+/* 地图图例样式 */
+.message-html :deep(.map-legend) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 20px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(248,249,250,0.95));
+  border-top: 1px solid rgba(0,0,0,0.08);
+  flex-wrap: wrap;
+}
+
+.message-html :deep(.legend-item) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+}
+
+.message-html :deep(.legend-item:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.message-html :deep(.legend-color) {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.message-html :deep(.legend-text) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Tab导航栏样式 */
+.message-html :deep(.itinerary-tabs) {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #F8F9FA;
+  border-radius: 12px;
+  margin-top: 16px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.message-html :deep(.itinerary-tabs::-webkit-scrollbar) {
+  height: 6px;
+}
+
+.message-html :deep(.itinerary-tabs::-webkit-scrollbar-thumb) {
+  background: #CCC;
+  border-radius: 3px;
+}
+
+.message-html :deep(.tab-btn) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5F6368;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.message-html :deep(.tab-btn:hover) {
+  background: #F1F3F4;
+  border-color: var(--tab-color, #1A73E8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.message-html :deep(.tab-btn.active) {
+  background: linear-gradient(135deg, var(--tab-color, #1A73E8) 0%, color-mix(in srgb, var(--tab-color, #1A73E8) 85%, black) 100%);
+  color: white;
+  border-color: var(--tab-color, #1A73E8);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25);
+}
+
+.message-html :deep(.tab-icon) {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Tab内容区域 */
+.message-html :deep(.tab-content-wrapper) {
+  margin-top: 16px;
+}
+
+.message-html :deep(.tab-content) {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.message-html :deep(.tab-content.active) {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 单天详细卡片样式 */
+.message-html :deep(.day-detail-card) {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.message-html :deep(.day-detail-header) {
+  padding: 20px;
+  color: white;
+  text-align: center;
+}
+
+.message-html :deep(.day-detail-header h3) {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.message-html :deep(.day-detail-header p) {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.message-html :deep(.activities-detail) {
+  list-style: none;
+  padding: 20px;
+  margin: 0;
+}
+
+.message-html :deep(.activity-detail) {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: #F8F9FA;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.message-html :deep(.activity-detail:hover) {
+  background: #E8F0FE;
+  transform: translateX(4px);
+}
+
+.message-html :deep(.activity-number) {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.message-html :deep(.activity-info) {
+  flex: 1;
+}
+
+.message-html :deep(.activity-name) {
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 4px;
+}
+
+.message-html :deep(.activity-notes) {
+  font-size: 14px;
+  color: #5F6368;
+  line-height: 1.5;
+}
+
+.message-html :deep(.route-container-detail) {
+  padding: 0 16px;
+  margin: 12px 0;
+}
+
+.message-html :deep(.day-detail-summary) {
+  padding: 16px 20px;
+  background: #FFF8E1;
+  border-top: 1px solid #FFF3CC;
+  color: #856404;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* 行程卡片容器 */
 .message-html :deep(.itinerary-container) {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 16px;
 }
 
 /* 景点hover效果 */
@@ -3130,19 +3728,21 @@ onMounted(async () => {
 }
 
 .message.user .message-avatar {
-  background: #007bff;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
 }
 
 .message.user .message-avatar svg {
-  color: white;
+  color: #2c2c2c;
 }
 
 .message.assistant .message-avatar {
-  background: #6c757d;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
 }
 
 .message.assistant .message-avatar svg {
-  color: white;
+  color: #2c2c2c;
 }
 
 .message-content {

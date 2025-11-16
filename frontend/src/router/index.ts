@@ -17,11 +17,7 @@ const router = createRouter({
       // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
-    {
-      path: '/travel-map',
-      name: 'travel-map',
-      component: () => import('../views/TravelMapView.vue'),
-    },
+    // TravelMapView 已移除，地图功能已集成到 ChatView 中
   ],
 })
 

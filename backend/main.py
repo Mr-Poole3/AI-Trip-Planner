@@ -15,6 +15,11 @@ from hotel_agent import HotelAgent
 from pydantic import BaseModel
 import urllib.parse
 import urllib.request
+import sys
+
+# 🆕 Windows 兼容性：设置事件循环策略
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # 加载环境变量
 load_dotenv()
@@ -46,17 +51,43 @@ hotel_agent = HotelAgent()
 AMAP_KEY = os.environ.get("AMAP_KEY")
 
 def extract_first_json(text: str) -> dict:
-    """提取第一个有效的JSON对象（支持嵌套数组和对象）"""
-    # 1. 直接尝试解析
+    """
+    提取第一个有效的JSON对象（支持嵌套数组和对象）
+    增强版：自动清理常见的LLM输出格式问题
+    """
+    import re
+    
+    # 0. 预处理：清理常见的LLM输出问题
+    cleaned_text = text.strip()
+    
+    # 移除markdown代码块标记
+    if cleaned_text.startswith('```'):
+        # 移除开头的```json或```
+        cleaned_text = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_text)
+        # 移除结尾的```
+        cleaned_text = re.sub(r'\n?```\s*$', '', cleaned_text)
+        cleaned_text = cleaned_text.strip()
+    
+    # 移除常见的前缀文字（如"好的，这是计划："）
+    if not cleaned_text.startswith('{'):
+        # 查找第一个{的位置，移除之前的所有内容
+        json_start = cleaned_text.find('{')
+        if json_start > 0:
+            prefix = cleaned_text[:json_start].strip()
+            if len(prefix) < 50:  # 只移除短前缀（避免误删）
+                logger.warning(f"检测到JSON前缀文字，已移除: {prefix}")
+                cleaned_text = cleaned_text[json_start:]
+    
+    # 1. 直接尝试解析清理后的文本
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+        return json.loads(cleaned_text)
+    except json.JSONDecodeError as e:
+        logger.debug(f"直接解析失败: {e}")
     
     # 2. 查找JSON对象（使用栈匹配括号，支持数组）
-    import re
-    start_idx = text.find('{')
+    start_idx = cleaned_text.find('{')
     if start_idx == -1:
+        logger.warning("未找到JSON起始括号")
         return {"type": "chat", "content": text}
     
     # 使用栈来跟踪所有类型的括号
@@ -64,8 +95,8 @@ def extract_first_json(text: str) -> dict:
     in_string = False
     escape = False
     
-    for i in range(start_idx, len(text)):
-        char = text[i]
+    for i in range(start_idx, len(cleaned_text)):
+        char = cleaned_text[i]
         
         if escape:
             escape = False
@@ -89,9 +120,11 @@ def extract_first_json(text: str) -> dict:
                     bracket_stack.pop()
                     if len(bracket_stack) == 0:
                         # 找到完整的JSON对象
-                        json_str = text[start_idx:i+1]
+                        json_str = cleaned_text[start_idx:i+1]
                         try:
-                            return json.loads(json_str)
+                            result = json.loads(json_str)
+                            logger.info(f"✅ 通过括号匹配成功解析JSON")
+                            return result
                         except Exception as e:
                             logger.error(f"JSON解析失败: {e}, 内容: {json_str[:200]}...")
                             pass
@@ -100,14 +133,26 @@ def extract_first_json(text: str) -> dict:
                 if bracket_stack and bracket_stack[-1] == '[':
                     bracket_stack.pop()
     
-    # 3. 如果栈匹配失败，尝试直接解析整个文本
+    # 3. 如果栈匹配失败，尝试直接解析整个清理后的文本
     try:
-        return json.loads(text)
-    except:
-        pass
+        return json.loads(cleaned_text)
+    except Exception as e:
+        logger.debug(f"整体解析失败: {e}")
     
-    # 4. 返回原始内容作为聊天
-    logger.warning(f"无法解析JSON，返回聊天模式")
+    # 4. 最后尝试：移除JSON注释（虽然不标准，但有些LLM会输出）
+    try:
+        # 移除 // 单行注释
+        cleaned_no_comments = re.sub(r'//.*?(?=\n|$)', '', cleaned_text)
+        # 移除 /* */ 多行注释
+        cleaned_no_comments = re.sub(r'/\*.*?\*/', '', cleaned_no_comments, flags=re.DOTALL)
+        result = json.loads(cleaned_no_comments)
+        logger.info(f"✅ 移除注释后成功解析JSON")
+        return result
+    except Exception as e:
+        logger.debug(f"移除注释后仍解析失败: {e}")
+    
+    # 5. 返回原始内容作为聊天
+    logger.warning(f"无法解析JSON，返回聊天模式。原始内容前100字符: {text[:100]}")
     return {"type": "chat", "content": text}
 
 class TravelPlanRequest(BaseModel):
@@ -135,6 +180,7 @@ class ChatRequest(BaseModel):
     model: str = "doubao-1-5-thinking-vision-pro-250428"
     system_prompt: Optional[str] = None  # 系统提示词
     travel_draft: Optional[TravelPlanDraft] = None  # 旅行计划草稿
+    current_plan: Optional[dict] = None  # 🆕 当前激活的旅行计划（用于修改）
 
 class ChatResponse(BaseModel):
     message: str
@@ -142,6 +188,7 @@ class ChatResponse(BaseModel):
 
 class HotelChatRequest(BaseModel):
     message: str
+    travel_plan: Optional[dict] = None  # 🆕 用户的旅行计划（如果有）
 
 class RouteTestRequest(BaseModel):
     origin_name: str
@@ -193,7 +240,11 @@ async def hotel_chat(request: HotelChatRequest):
                 
                 # 在线程池中运行同步代码
                 loop = asyncio.get_event_loop()
-                intent_result = await loop.run_in_executor(None, hotel_agent.analyze_intent, request.message)
+                # 🆕 传递旅行计划给意图识别
+                intent_result = await loop.run_in_executor(
+                    None, 
+                    lambda: hotel_agent.analyze_intent(request.message, request.travel_plan)
+                )
                 
                 step1_completed = json.dumps({'step': 1, 'status': 'completed', 'message': '需求分析完成', 'data': intent_result}, ensure_ascii=False)
                 logger.info(f"发送步骤1 completed: {step1_completed}")
@@ -248,9 +299,9 @@ async def hotel_chat(request: HotelChatRequest):
                 yield ": ping\n\n"  # SSE 注释行，强制刷新
                 await asyncio.sleep(0.1)
                 
-                # 在后台线程中执行搜索
-                logger.info("开始在后台线程执行酒店搜索...")
-                search_result = await loop.run_in_executor(None, hotel_agent.search_hotels, params)
+                # 🆕 直接调用异步方法（不需要 executor）
+                logger.info("开始执行酒店搜索...")
+                search_result = await hotel_agent.search_hotels(params)
                 logger.info(f"酒店搜索完成，结果: {search_result.get('success')}")
                 
                 if not search_result.get("success"):
@@ -280,7 +331,8 @@ async def hotel_chat(request: HotelChatRequest):
 
                 # 真正的流式生成推荐
                 try:
-                    for chunk in hotel_agent.generate_recommendations(request.message, search_result):
+                    # 🆕 传递旅行计划给推荐生成器
+                    for chunk in hotel_agent.generate_recommendations(request.message, search_result, request.travel_plan):
                         if chunk:
                             yield f"data: {json.dumps({'type': 'recommendation_chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
                             await asyncio.sleep(0.05)  # 小延迟以实现打字机效果
@@ -426,34 +478,67 @@ async def chat(request: ChatRequest):
                 
                 # 构建计划生成提示词
                 PLAN_GENERATION_PROMPT = (
-                    "你是专业的旅行规划师，根据用户需求生成详细的每日行程。\n"
-                    "\n【输出格式】严格JSON，无任何额外文字！\n"
-                    f"\n【用户需求】\n{json.dumps(draft, ensure_ascii=False, indent=2)}\n"
-                    "\n【任务】\n"
-                    "基于以上信息，生成完整的每日旅行计划。\n"
-                    "输出格式：{\"type\":\"daily_plan_json\",\"plan\":{...},\"itinerary\":[...]}\n"
-                    "\n【行程规划规则】\n"
-                    "1. 如果用户指定了景点（attractions），必须包含在行程中，但不局限于它们\n"
-                    "2. 如果用户没指定景点，你要根据目的地推荐热门景点\n"
-                    "3. 排期规则：\n"
-                    "   - 全天景点（游乐园/爬山等）：单独安排一天\n"
-                    "   - 城市打卡类（寺庙/博物馆等）：每天安排3-4个，保持相邻景点可步行或短途通勤\n"
-                    "4. 每天行程包含：\n"
-                    "   - day: 天数\n"
-                    "   - date: 日期（YYYY-MM-DD）\n"
-                    "   - title: 标题（如\"Day 1\"）\n"
-                    "   - activities: [{\"name\":\"景点名\", \"notes\":\"可选说明\"}]\n"
-                    "   - summary: 当天总结（交通方式、注意事项等）\n"
-                    "5. 活动名称必须是单一、标准化的中文景点官方名称\n"
-                    "6. plan字段包含：destination, origin, start_date, end_date, people（默认2），**city（必填）**\n"
-                    "\n【重要：城市识别】\n"
-                    "- 必须在plan中添加\"city\"字段\n"
-                    "- 分析目的地(destination)，提取所属的**城市名称**\n"
-                    "- 例如：destination=\"上海迪士尼\" → city=\"上海\"\n"
-                    "- 例如：destination=\"西湖\" → city=\"杭州\"\n"
-                    "- 例如：destination=\"北京\" → city=\"北京\"\n"
-                    "- city字段用于公交路线查询，必须是标准的城市名称（不带\"市\"字）\n"
-                    "\n再次强调：只输出JSON！"
+                    "# 旅行规划JSON生成任务\n\n"
+                    "## 🚨 输出格式要求（必须严格遵守）\n"
+                    "1. **只输出一个完整的JSON对象，不要添加任何前后文字、标记或解释**\n"
+                    "2. **不要使用markdown代码块标记（```json）**\n"
+                    "3. **确保JSON完整闭合，所有括号、引号必须配对**\n"
+                    "4. **不要截断输出，必须输出完整的JSON**\n"
+                    "5. **使用标准JSON格式，不要使用注释或非标准语法**\n\n"
+                    
+                    "## ✅ 正确示例\n"
+                    '{"type":"daily_plan_json","plan":{"destination":"上海","origin":"成都","start_date":"2025-11-16","end_date":"2025-11-18","people":2,"city":"上海"},"itinerary":[{"day":1,"date":"2025-11-16","title":"Day 1","activities":[{"name":"外滩","notes":"观赏夜景"}],"summary":"交通以地铁为主"}]}\n\n'
+                    
+                    "## ❌ 错误示例\n"
+                    "```json\n{...}\n```  ← 不要markdown标记\n"
+                    "好的，这是计划：{...}  ← 不要额外文字\n"
+                    '{"type":"daily_plan_json"...  ← 不要截断\n\n'
+                    
+                    f"## 📋 用户需求\n{json.dumps(draft, ensure_ascii=False, indent=2)}\n\n"
+                    
+                    "## 🎯 JSON结构规范\n"
+                    "```\n"
+                    "{\n"
+                    '  "type": "daily_plan_json",  // 固定值\n'
+                    '  "plan": {\n'
+                    '    "destination": "目的地",\n'
+                    '    "origin": "出发地",\n'
+                    '    "start_date": "YYYY-MM-DD",\n'
+                    '    "end_date": "YYYY-MM-DD",\n'
+                    '    "people": 2,  // 人数，默认2\n'
+                    '    "city": "城市名"  // ⚠️ 必填：从destination提取城市名（如"上海迪士尼"→"上海"）\n'
+                    "  },\n"
+                    '  "itinerary": [  // 每日行程数组\n'
+                    "    {\n"
+                    '      "day": 1,\n'
+                    '      "date": "YYYY-MM-DD",\n'
+                    '      "title": "Day 1",\n'
+                    '      "activities": [  // 当天活动数组\n'
+                    '        {"name": "景点官方名称", "notes": "可选说明"}\n'
+                    "      ],\n"
+                    '      "summary": "当天总结（交通方式、注意事项）"\n'
+                    "    }\n"
+                    "  ]\n"
+                    "}\n"
+                    "```\n\n"
+                    
+                    "## 📌 行程规划规则\n"
+                    "1. **景点选择**：\n"
+                    "   - 用户指定景点(attractions)：必须包含，可适当补充\n"
+                    "   - 未指定景点：根据目的地推荐热门景点\n"
+                    "2. **排期规则**：\n"
+                    "   - 全天景点（游乐园/爬山）：单独一天\n"
+                    "   - 城市打卡（博物馆/寺庙）：每天3-4个，邻近景点组合\n"
+                    "3. **活动名称**：使用标准化中文景点官方名称（如\"外滩\"而非\"外滩风景区\"）\n"
+                    "4. **城市字段**：从destination提取城市名，不带\"市\"字（\"杭州\"不是\"杭州市\"）\n\n"
+                    
+                    "## ⚠️ 最后提醒\n"
+                    "- 第一个字符必须是 `{`\n"
+                    "- 最后一个字符必须是 `}`\n"
+                    "- 中间不要有任何非JSON内容\n"
+                    "- 确保所有字符串使用双引号\n"
+                    "- 确保JSON完整不截断\n\n"
+                    "现在开始输出JSON："
                 )
                 
                 plan_messages = [
@@ -465,11 +550,12 @@ async def chat(request: ChatRequest):
                     plan_messages.insert(1, {"role": "system", "content": request.system_prompt})
                 
                 # 调用LLM生成计划
+                # 使用较低的temperature确保输出格式稳定，增加max_tokens避免截断
                 plan_resp = client.chat.completions.create(
                     model=request.model,
                     messages=plan_messages,
-                    temperature=0.7,
-                    max_tokens=4000,
+                    temperature=0.3,  # 降低随机性，提高格式稳定性
+                    max_tokens=6000,  # 增加token限制，避免JSON被截断
                 )
                 
                 plan_raw = plan_resp.choices[0].message.content.strip()
@@ -479,8 +565,11 @@ async def chat(request: ChatRequest):
                 plan_data = extract_first_json(plan_raw)
                 if plan_data:
                     logger.info(f"📊 解析后的JSON类型: {plan_data.get('type')}")
+                    # 如果解析成功但类型不对，输出完整内容用于调试
+                    if plan_data.get('type') != 'daily_plan_json':
+                        logger.error(f"❌ 类型错误！完整LLM返回:\n{plan_raw}")
                 else:
-                    logger.error(f"❌ JSON解析返回None！原始内容: {plan_raw}")
+                    logger.error(f"❌ JSON解析返回None！完整LLM返回:\n{plan_raw}")
                 
                 # 返回生成的计划
                 if plan_data.get("type") == "daily_plan_json":
@@ -498,7 +587,8 @@ async def chat(request: ChatRequest):
 
         # 构建提示词 - 支持草稿模式
         draft_info = ""
-        has_draft = request.travel_draft and any([
+        # 🆕 如果有激活的计划，跳过草稿处理（避免触发需求收集）
+        has_draft = (not request.current_plan) and request.travel_draft and any([
             request.travel_draft.destination,
             request.travel_draft.origin,
             request.travel_draft.start_date,
@@ -509,15 +599,47 @@ async def chat(request: ChatRequest):
             draft_dict = request.travel_draft.dict(exclude_none=True)
             draft_info = f"\n\n【当前收集到的信息】（用户正在逐步提供）：\n{json.dumps(draft_dict, ensure_ascii=False, indent=2)}"
         
+        # 🆕 检查是否有当前计划（用于修改）
+        plan_modification_info = ""
+        if request.current_plan:
+            plan_json = json.dumps(request.current_plan, ensure_ascii=False, indent=2)
+            plan_modification_info = f"""
+
+【当前已有旅行计划】
+以下是用户当前激活的旅行计划：
+```json
+{plan_json}
+```
+
+⚠️ 计划修改模式已激活！
+- 如果用户的输入是要修改这个计划（例如："把第二天的XX改成YY"、"增加一个景点"、"删除第三天"、"调整行程"等），请：
+  1. 理解用户的修改意图
+  2. 基于当前计划进行相应的修改
+  3. 返回完整的修改后的计划JSON（type = "daily_plan_json"）
+  4. 保持其他未修改的部分不变
+  5. 确保日期连续性和逻辑合理性
+
+- 修改规则：
+  * 景点替换：替换指定景点，保持其他景点不变
+  * 增加景点：在指定位置或天数插入新景点
+  * 删除景点：移除指定景点，后续景点前移
+  * 天数调整：如果修改涉及天数变化，要相应调整后续所有天数和日期
+  * 保持格式：输出的JSON结构必须与原计划完全一致
+
+⚠️ 重要：修改计划时，必须返回 type="daily_plan_json" 的完整计划JSON！
+"""
+        
         INTENT_PROMPT = (
             "你是旅行规划助手，职责：收集旅行必填信息。\n"
             f"{draft_info}\n"
+            f"{plan_modification_info}\n"
             "\n【输出格式】严格JSON，无任何额外文字！\n"
             "正确：{\"type\":\"chat\",\"content\":\"...\"}\n"
             "错误：好的，{...}（不要任何前后文字）\n"
             "\n【输出类型】\n"
             "1. 普通聊天：{\"type\":\"chat\",\"content\":\"...\"}\n"
             "2. 收集信息：{\"type\":\"draft_update\",\"updates\":{...},\"draft\":{...},\"missing_required\":[...],\"is_complete\":true/false,\"next_question\":\"...\"}\n"
+            "3. 修改计划：{\"type\":\"daily_plan_json\",\"plan\":{...},\"itinerary\":[...]}（当current_plan存在且用户要求修改时）\n"
             "\n【核心规则 - 重要】\n"
             "你只负责收集4个必填字段：\n"
             "1. destination - 目的地城市\n"
