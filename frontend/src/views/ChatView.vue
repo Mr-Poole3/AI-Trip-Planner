@@ -14,9 +14,9 @@
         </div>
         <!-- 搜索框 -->
         <div class="search-section">
-          <input 
-            v-model="searchQuery" 
-            placeholder="搜索聊天..." 
+          <input
+            v-model="searchQuery"
+            placeholder="搜索聊天..."
             class="search-input"
           />
         </div>
@@ -24,8 +24,8 @@
         <div class="chat-history-section">
           <div class="section-title">聊天</div>
           <div class="chat-history-list">
-            <div 
-              v-for="(chat, index) in filteredChatHistory" 
+            <div
+              v-for="(chat, index) in filteredChatHistory"
               :key="chat.id"
               @click="loadChatSession(chat)"
               class="chat-history-item"
@@ -54,7 +54,7 @@
           <button @click="clearCurrentChat" class="clear-btn">清空对话</button>
         </div>
       </div>
-    
+
           <div class="chat-messages" ref="messagesContainer">
         <!-- 开始页面 - 当没有消息时显示 -->
         <div v-if="messages.length === 0" class="start-page">
@@ -72,9 +72,18 @@
                 <span>↗</span>
               </button>
             </div>
+            <div class="start-actions">
+              <button @click="bookingEnabled = !bookingEnabled" class="booking-toggle-btn" :class="{ active: bookingEnabled }" title="启用/关闭酒店搜索">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="5" width="18" height="14" rx="2"/>
+                  <path d="M8 9h8M8 13h6"/>
+                </svg>
+                <span>酒店搜索</span>
+              </button>
+            </div>
           </div>
         </div>
-        
+
         <!-- 正常聊天消息 -->
         <div v-for="(message, index) in messages" :key="index" class="message-wrapper">
         <div :class="['message', message.role]">
@@ -89,6 +98,41 @@
             </svg>
           </div>
           <div class="message-content">
+            <!-- 酒店步骤展示 -->
+            <div v-if="message.hotelSteps && message.hotelSteps.length" class="steps-container">
+              <div v-for="(step, stepIndex) in message.hotelSteps" :key="stepIndex" :class="['step-item', step.status]">
+                <div class="step-header">
+                  <div class="step-icon">
+                    <span v-if="step.status === 'running'">⏳</span>
+                    <span v-else-if="step.status === 'completed'">✅</span>
+                    <span v-else-if="step.status === 'error'">❌</span>
+                    <span v-else>⭕</span>
+                  </div>
+                  <div class="step-info">
+                    <div class="step-title">步骤 {{ step.step }}: {{ step.message }}</div>
+                    <div v-if="step.data" class="step-data">
+                      <pre>{{ JSON.stringify(step.data, null, 2) }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- 旅行规划步骤展示 -->
+            <div v-if="message.travelSteps && message.travelSteps.length" class="steps-container">
+              <div v-for="(step, stepIndex) in message.travelSteps" :key="stepIndex" :class="['step-item', step.status]">
+                <div class="step-header">
+                  <div class="step-icon">
+                    <span v-if="step.status === 'running'">⏳</span>
+                    <span v-else-if="step.status === 'completed'">✅</span>
+                    <span v-else-if="step.status === 'error'">❌</span>
+                    <span v-else>⭕</span>
+                  </div>
+                  <div class="step-info">
+                    <div class="step-title">步骤 {{ step.step }}: {{ step.message }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <!-- 思考过程展示 -->
             <div v-if="showReasoningGlobal && message.reasoning && message.reasoning.trim()" class="reasoning-section">
               <div class="reasoning-header">
@@ -125,18 +169,18 @@
                   <span class="tool-name">{{ toolCall.name }}</span>
                   <span v-if="toolCall.server_name" class="tool-server">({{ toolCall.server_name }})</span>
                 </div>
-                
+
                 <!-- 工具参数 -->
                 <div v-if="toolCall.arguments && Object.keys(toolCall.arguments).length > 0" class="tool-arguments">
-                  <strong>参数:</strong> 
+                  <strong>参数:</strong>
                   <code>{{ JSON.stringify(toolCall.arguments, null, 2) }}</code>
                 </div>
-                
+
                 <!-- 工具结果 - 使用抽屉展示 -->
                 <div v-if="toolCall.result" class="tool-result-drawer">
                   <div class="drawer-header">
                     <strong>结果:</strong>
-                    <button 
+                    <button
                       @click="toggleToolResult(index, toolIndex)"
                       class="drawer-toggle"
                       :class="{ expanded: isToolResultExpanded(index, toolIndex) }"
@@ -157,7 +201,7 @@
                     </div>
                   </div>
                 </div>
-                
+
                 <!-- 工具错误 -->
                 <div v-if="toolCall.error" class="tool-error">
                   <strong>错误:</strong> {{ toolCall.error }}
@@ -168,42 +212,24 @@
             <!-- 消息内容 -->
             <div v-for="(content, contentIndex) in message.content" :key="contentIndex">
               <div v-if="content.type === 'text'" class="message-text markdown-body" v-html="renderMarkdown(content.text)"></div>
+              <div v-else-if="content.type === 'html'" class="message-html" v-html="content.text"></div>
               <img v-if="content.type === 'image_url' && content.image_url" :src="content.image_url.url" class="message-image" />
             </div>
 
-            <!-- 流式接收指示器 -->
-            <div v-if="message.isStreaming" class="streaming-indicator">
-              <span class="cursor">|</span>
-            </div>
+            <!-- 轻量流式状态提示 -->
+            <div v-if="message.isStreaming" class="streaming-status">生成中…</div>
           </div>
         </div>
       </div>
-      
-      <div v-if="isLoading" class="message-wrapper">
-        <div class="message assistant">
-          <div class="message-avatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="10" rx="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
-            </svg>
-          </div>
-          <div class="message-content">
-            <div class="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </div>
-        </div>
-      </div>
+
+      <!-- 取消底部加载占位文本框 -->
     </div>
-    
           <div v-if="messages.length > 0" class="chat-input-container">
         <div v-if="selectedImage" class="image-preview">
         <img :src="selectedImage" alt="预览图片" />
         <button @click="removeImage" class="remove-image-btn">×</button>
       </div>
-      
+
       <div class="input-wrapper">
         <input
           type="file"
@@ -218,6 +244,14 @@
             <circle cx="8.5" cy="8.5" r="1.5"/>
             <path d="M21 15l-5-5L5 21"/>
           </svg>
+        </button>
+        <!-- 酒店搜索开关按钮，样式与“深度思考”按钮一致的圆角与布局 -->
+        <button @click="bookingEnabled = !bookingEnabled" class="booking-toggle-btn" :class="{ active: bookingEnabled }" title="启用/关闭酒店搜索">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="5" width="18" height="14" rx="2"/>
+            <path d="M8 9h8M8 13h6"/>
+          </svg>
+          <span>酒店搜索</span>
         </button>
         <input
           v-model="inputMessage"
@@ -243,9 +277,17 @@ import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 
 interface MessageContent {
-  type: 'text' | 'image_url'
+  type: 'text' | 'image_url' | 'html'
   text?: string
   image_url?: { url: string }
+}
+
+// 酒店步骤信息类型
+interface StepInfo {
+  step: number
+  status: 'pending' | 'running' | 'completed' | 'error'
+  message: string
+  data?: any
 }
 
 interface Message {
@@ -254,6 +296,8 @@ interface Message {
   reasoning?: string  // 思考过程
   isStreaming?: boolean  // 是否正在流式接收
   toolCalls?: ToolCall[]  // 工具调用信息
+  hotelSteps?: StepInfo[] // 酒店步骤
+  travelSteps?: StepInfo[] // 旅行步骤
 }
 
 interface ToolCall {
@@ -271,9 +315,11 @@ const isLoading = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const fileInput = ref<HTMLInputElement>()
 const showReasoning = ref<Record<number, boolean>>({})
+const bookingEnabled = ref(false)
+const travelStepMsgMap = ref<Record<number, number>>({})
 
-// 思考过程显示控制
-const showReasoningGlobal = ref(true)
+// 思考过程显示控制（默认关闭）
+const showReasoningGlobal = ref(false)
 
 // 历史记录管理
 const CHAT_HISTORY_KEY = 'ai_chat_history'
@@ -333,7 +379,7 @@ const filteredChatHistory = computed(() => {
   if (!searchQuery.value) {
     return chatSessions.value
   }
-  return chatSessions.value.filter(chat => 
+  return chatSessions.value.filter(chat =>
     chat.title.toLowerCase().includes(searchQuery.value.toLowerCase())
   )
 })
@@ -358,11 +404,11 @@ const handleImageUpload = async (event: Event) => {
       method: 'POST',
       body: formData
     })
-    
+
     if (!response.ok) {
       throw new Error('图片上传失败')
     }
-    
+
     const data = await response.json()
     selectedImage.value = data.image_url
   } catch (error) {
@@ -414,125 +460,144 @@ const sendMessage = async () => {
   if (fileInput.value) {
     fileInput.value.value = ''
   }
-  
+
   // 保存用户消息到会话
   saveCurrentSession()
 
   isLoading.value = true
-  await scrollToBottom()
-
-  // 创建助手消息用于流式接收
-  const assistantMessage: Message = {
-    role: 'assistant',
-    content: [{
-      type: 'text',
-      text: ''
-    }],
-    reasoning: '',
-    isStreaming: true
-  }
-
-  messages.value.push(assistantMessage)
+  travelStepMsgMap.value = {}
   await scrollToBottom()
 
   try {
-    const response = await fetch('http://localhost:9000/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        messages: messages.value.slice(0, -1) // 不包含正在创建的助手消息
+    if (!bookingEnabled.value) {
+      const original = [...messages.value]
+      const step1: StepInfo = { step: 1, status: 'running', message: '正在分析您的需求...' }
+      messages.value.push({ role: 'assistant', content: [], travelSteps: [step1] })
+      travelStepMsgMap.value[1] = messages.value.length - 1
+      await scrollToBottom()
+
+      const response = await fetch('http://localhost:9000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: original,
+          system_prompt: (() => {
+            const fmt = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            const s = fmt.format(new Date()).replace(/\//g, '-')
+            return `当前北京时间：${s}。请参考该时间理解用户在本次消息中的日期表达（未给年份时礼貌确认，勿自行假设）。可选项（人数、景点）未提供时，请直接生成不含这些字段的计划，不要向用户提问可选项；如需建议，用notes字段说明，勿使用ask。输出活动仅包含景点推荐，所有activities[].name必须为单一、标准化的中文景点官方名称，不得包含斜杠、顿号或并列名称；不输出time字段；需要说明从属关系或补充信息写入notes。`
+          })()
+        })
       })
-    })
+      if (!response.ok) throw new Error('AI 响应失败')
+      const result = await response.json()
 
-    if (!response.ok) {
-      throw new Error('AI 响应失败')
-    }
-
-    const reader = response.body?.getReader()
-    const decoder = new TextDecoder()
-
-    if (!reader) {
-      throw new Error('无法读取响应流')
-    }
-
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-
-      if (done) {
-        break
+      const idx1 = travelStepMsgMap.value[1]
+      if (idx1 !== undefined) {
+        messages.value[idx1].travelSteps = [{ step: 1, status: 'completed', message: '需求分析完成' }]
+        messages.value[idx1] = { ...messages.value[idx1] }
       }
 
-      buffer += decoder.decode(value, { stream: true })
+      if (result.type === 'ask') {
+        messages.value.push({ role: 'assistant', content: [], travelSteps: [{ step: 2, status: 'completed', message: '需要补充信息' }] })
+        messages.value.push({ role: 'assistant', content: [{ type: 'text', text: result.content }] })
+        saveCurrentSession()
+        return
+      }
 
-      // 处理完整的行
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || '' // 保留最后一个可能不完整的行
+      if (result.type === 'daily_plan_json') {
+        messages.value.push({ role: 'assistant', content: [], travelSteps: [{ step: 2, status: 'running', message: '正在生成每日计划...' }] })
+        const html = buildDailyPlanHtml(result)
+        messages.value.push({ role: 'assistant', content: [{ type: 'html', text: html }] })
+        const idx2 = messages.value.length - 2
+        messages.value[idx2].travelSteps = [{ step: 2, status: 'completed', message: '每日计划生成完成' }]
+        messages.value[idx2] = { ...messages.value[idx2] }
+        await populateRoutesForMessage(messages.value.length - 1, result?.plan?.destination || '')
+        saveCurrentSession()
+        return
+      }
 
-      for (const line of lines) {
-        if (line.trim() && line.startsWith('data: ')) {
-          try {
-            const jsonStr = line.slice(6).trim()
-            if (jsonStr && jsonStr !== '[DONE]') {
+      if (result.type === 'plan_json') {
+        messages.value.push({ role: 'assistant', content: [{ type: 'text', text: JSON.stringify(result.plan, null, 2) }] })
+        saveCurrentSession()
+        return
+      }
+
+      if (result.type === 'chat') {
+        messages.value.push({ role: 'assistant', content: [{ type: 'text', text: result.content }] })
+        saveCurrentSession()
+        return
+      }
+    } else {
+      // 酒店搜索：展示步骤与推荐
+      const stepsMessage: Message = { role: 'assistant', content: [], hotelSteps: [] }
+      messages.value.push(stepsMessage)
+      const stepsIndex = messages.value.length - 1
+      await scrollToBottom()
+
+      const response = await fetch('http://localhost:9000/api/hotel-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: (content.find(c => c.type === 'text')?.text) || '' })
+      })
+      if (!response.ok) throw new Error('酒店搜索失败')
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      if (!reader) throw new Error('无法读取响应流')
+      let buffer = ''
+      let recommendationIndex: number | null = null
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.trim() && line.startsWith('data: ')) {
+            try {
+              const jsonStr = line.slice(6).trim()
+              if (!jsonStr) continue
               const data = JSON.parse(jsonStr)
-
-              if (data.type === 'content') {
-                // 追加内容到消息
-                const lastMessage = messages.value[messages.value.length - 1]
-                if (lastMessage && lastMessage.content[0] && lastMessage.content[0].type === 'text') {
-                  lastMessage.content[0].text += data.content
-                }
+              if (data.step) {
+                const currentSteps = messages.value[stepsIndex].hotelSteps || []
+                const existing = currentSteps.findIndex((s: StepInfo) => s.step === data.step)
+                const nextStep: StepInfo = { step: data.step, status: data.status, message: data.message, data: data.data }
+                if (existing >= 0) currentSteps[existing] = nextStep; else currentSteps.push(nextStep)
+                messages.value[stepsIndex].hotelSteps = [...currentSteps]
+                await nextTick(); await scrollToBottom()
+              } else if (data.type === 'recommendation_start') {
+                recommendationIndex = messages.value.length
+                messages.value.push({ role: 'assistant', content: [{ type: 'text', text: '' }], isStreaming: true })
                 await scrollToBottom()
-              } else if (data.type === 'reasoning') {
-                // 更新思考过程
-                const lastMessage = messages.value[messages.value.length - 1]
-                if (lastMessage) {
-                  if (!lastMessage.reasoning) {
-                    lastMessage.reasoning = ''
+              } else if (data.type === 'recommendation_chunk') {
+                if (recommendationIndex !== null) {
+                  const msg = messages.value[recommendationIndex]
+                  if (msg?.content[0]?.type === 'text') {
+                    msg.content[0].text += data.content
+                    messages.value[recommendationIndex] = { ...msg }
                   }
-                  lastMessage.reasoning += data.content
+                  await nextTick(); await scrollToBottom()
                 }
-                await scrollToBottom()
-              } else if (data.type === 'tool_call') {
-                // 处理工具调用结果
-                const lastMessage = messages.value[messages.value.length - 1]
-                if (lastMessage) {
-                  if (!lastMessage.toolCalls) {
-                    lastMessage.toolCalls = []
-                  }
-                  lastMessage.toolCalls.push(data.tool_call)
+              } else if (data.type === 'recommendation_end') {
+                if (recommendationIndex !== null) {
+                  const msg = messages.value[recommendationIndex]
+                  msg.isStreaming = false
+                  messages.value[recommendationIndex] = { ...msg }
                 }
+              } else if (data.type === 'final_response') {
+                messages.value.push({ role: 'assistant', content: [{ type: 'text', text: data.content }] })
                 await scrollToBottom()
               } else if (data.type === 'done') {
-                // 流式接收完成
-                const lastMessage = messages.value[messages.value.length - 1]
-                if (lastMessage) {
-                  lastMessage.isStreaming = false
-                }
-                // 保存完整对话到会话
-                saveCurrentSession()
-                return // 退出整个循环
+                saveCurrentSession(); await scrollToBottom(); return
               } else if (data.type === 'error') {
                 throw new Error(data.content)
               }
+            } catch (e) {
+              console.warn('解析酒店流失败:', e)
             }
-          } catch (parseError) {
-            console.warn('解析流数据失败:', parseError, '原始行:', line)
           }
         }
       }
     }
-
-    // 如果没有收到done信号，手动结束流式状态
-    const lastMessage = messages.value[messages.value.length - 1]
-    if (lastMessage) {
-      lastMessage.isStreaming = false
-    }
-    // 保存当前会话
-    saveCurrentSession()
 
   } catch (error) {
     console.error('发送消息失败:', error)
@@ -566,27 +631,27 @@ const createNewChat = () => {
   const newChatId = Date.now().toString()
   currentChatId.value = newChatId
   messages.value = []
-  
+
   // 清空输入框和选中的图片
   inputMessage.value = ''
   selectedImage.value = null
   if (fileInput.value) {
     fileInput.value.value = ''
   }
-  
+
   // 清空工具调用结果展开状态
   toolResultExpanded.value = {}
-  
+
   console.log('新聊天已创建，ID:', newChatId)
   console.log('当前消息数量:', messages.value.length)
-  
+
   // 滚动到顶部显示开始页面
   nextTick(() => {
     if (messagesContainer.value) {
       messagesContainer.value.scrollTop = 0
     }
   })
-  
+
   // 不添加欢迎消息，显示开始页面
 }
 
@@ -598,7 +663,7 @@ const loadChatSession = (session: ChatSession) => {
 const deleteChatSession = (sessionId: string) => {
   chatSessions.value = chatSessions.value.filter(chat => chat.id !== sessionId)
   saveChatSessions()
-  
+
   if (currentChatId.value === sessionId) {
     createNewChat()
   }
@@ -609,7 +674,7 @@ const formatTime = (timestamp: number) => {
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  
+
   if (diffDays === 0) {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   } else if (diffDays === 1) {
@@ -623,14 +688,14 @@ const formatTime = (timestamp: number) => {
 
 const clearCurrentChat = () => {
   messages.value = []
-  
+
   // 清空输入框和选中的图片
   inputMessage.value = ''
   selectedImage.value = null
   if (fileInput.value) {
     fileInput.value.value = ''
   }
-  
+
   // 不添加欢迎消息，显示开始页面
 }
 
@@ -697,10 +762,10 @@ const saveChatSessions = () => {
 
 const saveCurrentSession = () => {
   if (!currentChatId.value || messages.value.length === 0) return
-  
+
   const title = generateChatTitle()
   const existingIndex = chatSessions.value.findIndex(chat => chat.id === currentChatId.value)
-  
+
   const session: ChatSession = {
     id: currentChatId.value,
     title,
@@ -708,18 +773,18 @@ const saveCurrentSession = () => {
     createdAt: existingIndex === -1 ? Date.now() : chatSessions.value[existingIndex].createdAt,
     updatedAt: Date.now()
   }
-  
+
   if (existingIndex === -1) {
     chatSessions.value.unshift(session)
   } else {
     chatSessions.value[existingIndex] = session
   }
-  
+
   // 只保留最近的10个会话
   if (chatSessions.value.length > MAX_HISTORY_COUNT) {
     chatSessions.value = chatSessions.value.slice(0, MAX_HISTORY_COUNT)
   }
-  
+
   saveChatSessions()
 }
 
@@ -752,6 +817,112 @@ const truncateText = (text: string, maxLength: number) => {
     return text
   }
   return text.substring(0, maxLength)
+}
+
+const buildDailyPlanHtml = (data: any) => {
+  try {
+    const plan = data?.plan || {}
+    const itinerary = Array.isArray(data?.itinerary) ? data.itinerary : []
+    const notes = data?.notes
+    let html = `<div class="daily-plan">`
+    html += `<div class="plan-header"><div class="plan-title">每日行程</div><div class="plan-meta">出发地：${plan.origin || '-'} ｜ 目的地：${plan.destination || '-'} ｜ 日期：${plan.start_date || '-'} 至 ${plan.end_date || '-'}</div></div>`
+    for (const day of itinerary) {
+      html += `<div class="day-card"><div class="day-title">${day.title || `Day ${day.day}`}（${day.date || ''}）</div>`
+      if (Array.isArray(day.activities) && day.activities.length) {
+        html += `<ul class="activities">`
+        for (let i = 0; i < day.activities.length; i++) {
+          const act = day.activities[i]
+          html += `<li class="activity"><span class="name">${act.name || ''}</span>${act.notes ? `<span class="notes">${act.notes}</span>` : ''}</li>`
+          if (i < day.activities.length - 1) {
+            const next = day.activities[i + 1]
+            const o = String(act?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const d = String(next?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            html += `<li class="route-chip" data-origin="${o}" data-destination="${d}">🚗 计算中 ></li>`
+          }
+        }
+        html += `</ul>`
+      } else {
+        if (day.summary && String(day.summary).trim()) {
+          html += `<ul class="activities">`
+          const safeSummary = String(day.summary).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          html += `<li class="activity"><span class="time">全天</span><span class="name">当天安排</span><span class="notes">${safeSummary}</span></li>`
+          html += `</ul>`
+        }
+      }
+      if (day.summary) {
+        html += `<div class="day-summary">${day.summary}</div>`
+      }
+      html += `</div>`
+    }
+    if (notes) {
+      html += `<div class="plan-notes">${notes}</div>`
+    }
+    html += `</div>`
+    return html
+  } catch {
+    return '行程解析失败'
+  }
+}
+
+const buildDailyPlanPreview = (buffer: string) => {
+  // 轻量预览：提取已出现的 day 与 title，生成骨架卡片
+  try {
+    const titles: Array<{ day?: string; title?: string }> = []
+    const dayRegex = /"day"\s*:\s*(\d+)/g
+    const titleRegex = /"title"\s*:\s*"([^"]+)"/g
+    const days: number[] = []
+    let m: RegExpExecArray | null
+    while ((m = dayRegex.exec(buffer))) {
+      days.push(Number(m[1]))
+    }
+    const tt: string[] = []
+    let t: RegExpExecArray | null
+    while ((t = titleRegex.exec(buffer))) {
+      tt.push(t[1])
+    }
+    const len = Math.max(days.length, tt.length)
+    for (let i = 0; i < len; i++) {
+      titles.push({ day: days[i]?.toString(), title: tt[i] })
+    }
+    let html = `<div class="daily-plan">`
+    html += `<div class="plan-header"><div class="plan-title">每日行程（预览）</div><div class="plan-meta">正在生成…</div></div>`
+    titles.forEach((d, idx) => {
+      html += `<div class="day-card skeleton"><div class="day-title">${d.title || `Day ${d.day || idx + 1}`}</div><div class="activities"><div class="activity"><span class="time">…</span><span class="name">生成中</span></div></div></div>`
+    })
+    html += `</div>`
+    return html
+  } catch {
+    return '<div class="daily-plan">正在生成每日行程预览…</div>'
+  }
+}
+
+// 填充路线芯片：基于相邻活动名称调用后端路线测试接口
+const populateRoutesForMessage = async (msgIndex: number, city: string) => {
+  await nextTick()
+  const wrappers = messagesContainer.value?.querySelectorAll('.message-wrapper') || []
+  const el = wrappers[msgIndex] as HTMLElement
+  if (!el) return
+  const chips = el.querySelectorAll('.route-chip')
+  for (const chip of Array.from(chips)) {
+    const origin = (chip as HTMLElement).getAttribute('data-origin') || ''
+    const destination = (chip as HTMLElement).getAttribute('data-destination') || ''
+    if (!origin || !destination) continue
+    try {
+      const res = await fetch('http://localhost:9000/api/amap-route-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin_name: origin, destination_name: destination, city })
+      })
+      if (!res.ok) {
+        (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+        continue
+      }
+      const data = await res.json()
+      if (data?.success && data?.display) (chip as HTMLElement).textContent = data.display; else (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+    } catch {
+      (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+    }
+  }
 }
 
 // 新增的侧边栏功能方法
@@ -795,7 +966,7 @@ const openScholarGPT = () => {
 onMounted(async () => {
   // 加载聊天会话
   loadChatSessions()
-  
+
   // 如果有会话，加载最新的一个，否则创建新会话
   if (chatSessions.value.length > 0) {
     const latestSession = chatSessions.value[0]
@@ -814,6 +985,116 @@ onMounted(async () => {
   background: #fff;
   overflow: hidden;
 }
+
+.message-html :deep(.daily-plan) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #F8F9FA;
+  border: 1px solid #E9ECEF;
+}
+.message-html :deep(.plan-header) {
+  margin-bottom: 4px;
+}
+.message-html :deep(.plan-title) {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+}
+.message-html :deep(.plan-meta) {
+  font-size: 13px;
+  color: #5F6368;
+}
+.message-html :deep(.day-card) {
+  margin-top: 0;
+  padding: 14px 16px 14px 28px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1px solid #E6E9EF;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.message-html :deep(.day-card:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10), 0 12px 28px rgba(0,0,0,0.12);
+}
+.message-html :deep(.day-card::before) {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 18px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1a73e8;
+  box-shadow: 0 0 0 3px #E8F0FE;
+}
+.message-html :deep(.day-card:not(:last-child)::after) {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 28px;
+  bottom: -14px;
+  width: 2px;
+  background: #E8F0FE;
+}
+.message-html :deep(.skeleton) { opacity: 0.7 }
+.message-html :deep(.day-title) {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #202124;
+}
+.message-html :deep(.activities) {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.message-html :deep(.route-chip) {
+  display: inline-block;
+  margin: 8px 0;
+  background: #E8F0FE;
+  color: #1a73e8;
+  border: 1px solid #D2E3FC;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.message-html :deep(.activity) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px dashed #ECEFF1;
+  flex-wrap: wrap;
+}
+.message-html :deep(.activity:last-child) {
+  border-bottom: none;
+}
+.message-html :deep(.time) {
+  background: #E8F0FE;
+  color: #1a73e8;
+  border: 1px solid #D2E3FC;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 88px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.message-html :deep(.name) { font-weight: 600; color: #202124; flex: 1; min-width: 0; }
+.message-html :deep(.notes) { color: #5F6368; flex-basis: 100%; margin-left: 0; }
+.message-html :deep(.day-summary) { margin-top: 8px; color: #3C4043; }
+.plan-notes { margin-top: 8px; font-size: 13px; color: #555; }
 
 /* 侧边栏样式 */
 .sidebar {
@@ -1317,6 +1598,13 @@ onMounted(async () => {
   transform: translateY(-50%);
 }
 
+.start-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
 /* 建议提示样式 */
 .suggestions {
   display: grid;
@@ -1491,20 +1779,14 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 
-.streaming-indicator {
+/* 移除流式光标样式 */
+
+/* 轻量的流式状态提示 */
+.streaming-status {
   display: inline-block;
-  margin-left: 4px;
-}
-
-.cursor {
-  animation: blink 1s infinite;
-  font-weight: bold;
-  color: #007bff;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6c757d;
 }
 
 .typing-indicator {
@@ -1625,4 +1907,68 @@ onMounted(async () => {
   background: #6c757d;
   cursor: not-allowed;
 }
+
+/* 酒店搜索开关按钮 */
+.booking-toggle-btn {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  padding: 10px 12px;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #495057;
+}
+.booking-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.booking-toggle-btn:hover { background: #e9ecef; }
+.booking-toggle-btn.active {
+  background: #e8f4ff;
+  border-color: #007bff;
+  color: #0056b3;
+}
+
+/* 酒店步骤展示样式 */
+.steps-container { display: flex; flex-direction: column; gap: 10px; }
+.step-item { padding: 12px; border-radius: 8px; border-left: 4px solid #ccc; background: #f8f9fa; }
+.step-item.running { border-left-color: #ffc107; background: #fff8e1; }
+.step-item.completed { border-left-color: #28a745; background: #d4edda; }
+.step-item.error { border-left-color: #dc3545; background: #f8d7da; }
+.step-header { display: flex; gap: 10px; align-items: flex-start; }
+.step-icon { font-size: 18px; flex-shrink: 0; }
+.step-info { flex: 1; }
+.step-title { font-weight: 600; color: #333; margin-bottom: 5px; }
+.step-data { margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px; }
+.step-data pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
 </style>
+const populateRoutesForMessage = async (msgIndex: number, city: string) => {
+  await nextTick()
+  const wrappers = messagesContainer.value?.querySelectorAll('.message-wrapper') || []
+  const el = wrappers[msgIndex] as HTMLElement
+  if (!el) return
+  const chips = el.querySelectorAll('.route-chip')
+  for (const chip of Array.from(chips)) {
+    const origin = (chip as HTMLElement).getAttribute('data-origin') || ''
+    const destination = (chip as HTMLElement).getAttribute('data-destination') || ''
+    if (!origin || !destination) continue
+    try {
+      const res = await fetch('http://localhost:9000/api/amap-route-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin_name: origin, destination_name: destination, city })
+      })
+      if (!res.ok) {
+        (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+        continue
+      }
+      const data = await res.json()
+      if (data?.success && data?.display) (chip as HTMLElement).textContent = data.display; else (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+    } catch {
+      (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+    }
+  }
+}
