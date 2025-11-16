@@ -318,8 +318,8 @@ A: 数据存储在 LocalStorage 中：
 ## 📧 联系方式
 
 如有问题或建议，欢迎联系：
-- 项目 Issue: [GitHub Issues](https://github.com/your-repo/issues)
-- 邮箱: your-email@example.com
+- 项目 Issue: [GitHub Issues](https://github.com/Mr-Poole3/AI-Trip-Planner)
+- 邮箱: 2840269475@qq.com
 
 ## 🙏 致谢
 
