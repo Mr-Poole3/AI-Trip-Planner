@@ -55,6 +55,79 @@
         </div>
       </div>
 
+      <!-- 草稿进度条 -->
+      <div v-if="isDraftMode" class="draft-progress-container">
+        <div class="draft-progress-header">
+          <div class="progress-info">
+            <svg class="progress-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            <span class="progress-title">旅行计划收集中</span>
+            <span class="progress-percentage">{{ draftCompleteness }}%</span>
+          </div>
+          <button @click="resetDraft" class="draft-reset-btn" title="取消规划">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="progress-bar-wrapper">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: draftCompleteness + '%' }"></div>
+          </div>
+        </div>
+
+        <div class="draft-fields-grid">
+          <div
+            v-for="(field, key) in {
+              destination: '目的地',
+              origin: '出发地',
+              start_date: '开始日期',
+              end_date: '结束日期'
+            }"
+            :key="key"
+            class="draft-field"
+            :class="{ filled: travelPlanDraft && travelPlanDraft[key as keyof TravelPlanDraft] }"
+          >
+            <div class="field-icon" :class="{ filled: travelPlanDraft && travelPlanDraft[key as keyof TravelPlanDraft] }">
+              <svg v-if="travelPlanDraft && travelPlanDraft[key as keyof TravelPlanDraft]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+              </svg>
+            </div>
+            <div class="field-content">
+              <div class="field-label">{{ field }}</div>
+              <input
+                v-if="key === 'start_date' || key === 'end_date'"
+                type="date"
+                :value="travelPlanDraft ? travelPlanDraft[key as keyof TravelPlanDraft] || '' : ''"
+                @change="(e: Event) => editDraftField(key as keyof TravelPlanDraft, (e.target as HTMLInputElement).value)"
+                class="field-input"
+                :placeholder="`请输入${field}`"
+              />
+              <input
+                v-else
+                type="text"
+                :value="travelPlanDraft ? travelPlanDraft[key as keyof TravelPlanDraft] || '' : ''"
+                @input="(e: Event) => editDraftField(key as keyof TravelPlanDraft, (e.target as HTMLInputElement).value)"
+                class="field-input"
+                :placeholder="`请输入${field}`"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div v-if="draftMissingFields.length > 0" class="draft-missing">
+          <span class="missing-icon">⚠️</span>
+          <span>还需要：{{ draftMissingFields.join('、') }}</span>
+        </div>
+      </div>
+
           <div class="chat-messages" ref="messagesContainer">
         <!-- 开始页面 - 当没有消息时显示 -->
         <div v-if="messages.length === 0" class="start-page">
@@ -298,6 +371,16 @@ interface Message {
   toolCalls?: ToolCall[]  // 工具调用信息
   hotelSteps?: StepInfo[] // 酒店步骤
   travelSteps?: StepInfo[] // 旅行步骤
+  mapData?: MapData  // 地图数据（用于缓存和重新渲染）
+  routesData?: Record<string, any>  // 🆕 路线数据缓存（避免重复API调用）
+}
+
+// 地图数据结构
+interface MapData {
+  itinerary: any[]  // 行程数据
+  city: string      // 城市
+  coordsMap: Record<string, number[]>  // 景点坐标映射（序列化后的 Map）
+  mapId: string     // 地图容器ID
 }
 
 interface ToolCall {
@@ -321,6 +404,40 @@ const travelStepMsgMap = ref<Record<number, number>>({})
 // 思考过程显示控制（默认关闭）
 const showReasoningGlobal = ref(false)
 
+// 旅行计划草稿状态管理
+interface TravelPlanDraft {
+  destination: string | null
+  origin: string | null
+  start_date: string | null
+  end_date: string | null
+  people: number | null
+  attractions: string[]
+}
+
+const travelPlanDraft = ref<TravelPlanDraft | null>(null)
+// DRAFT_STORAGE_KEY 已废弃：草稿现在跟会话绑定，存储在 ChatSession.draft 中
+
+// 草稿模式计算属性
+const isDraftMode = computed(() => travelPlanDraft.value !== null)
+const draftCompleteness = computed(() => {
+  if (!travelPlanDraft.value) return 0
+  const required = ['destination', 'origin', 'start_date', 'end_date']
+  const filled = required.filter(k => travelPlanDraft.value && travelPlanDraft.value[k as keyof TravelPlanDraft]).length
+  return Math.round((filled / required.length) * 100)
+})
+
+const draftMissingFields = computed(() => {
+  if (!travelPlanDraft.value) return []
+  const fieldNames: Record<string, string> = {
+    destination: '目的地',
+    origin: '出发地',
+    start_date: '开始日期',
+    end_date: '结束日期'
+  }
+  const required = ['destination', 'origin', 'start_date', 'end_date']
+  return required.filter(k => !travelPlanDraft.value || !travelPlanDraft.value[k as keyof TravelPlanDraft]).map(k => fieldNames[k])
+})
+
 // 历史记录管理
 const CHAT_HISTORY_KEY = 'ai_chat_history'
 const CHAT_SESSIONS_KEY = 'ai_chat_sessions'
@@ -338,6 +455,7 @@ interface ChatSession {
   messages: Message[]
   createdAt: number
   updatedAt: number
+  draft?: TravelPlanDraft | null  // 🆕 每个会话独立的草稿
 }
 
 const canSend = computed(() => {
@@ -427,12 +545,15 @@ const removeImage = () => {
 const sendMessage = async () => {
   if (!canSend.value) return
 
+  // 保存用户输入文本（在清空之前）
+  const userText = inputMessage.value.trim()
+
   const content: MessageContent[] = []
 
-  if (inputMessage.value.trim()) {
+  if (userText) {
     content.push({
       type: 'text',
-      text: inputMessage.value.trim()
+      text: userText
     })
   }
 
@@ -476,15 +597,22 @@ const sendMessage = async () => {
       travelStepMsgMap.value[1] = messages.value.length - 1
       await scrollToBottom()
 
+      // 智能启动草稿模式
+      if (!isDraftMode.value && isTravelRelated(userText)) {
+        // 第一次旅行相关输入，初始化草稿
+        initDraft()
+      }
+
       const response = await fetch('http://localhost:9000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: original,
+          travel_draft: travelPlanDraft.value || undefined,  // 发送草稿信息
           system_prompt: (() => {
             const fmt = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
             const s = fmt.format(new Date()).replace(/\//g, '-')
-            return `当前北京时间：${s}。请参考该时间理解用户在本次消息中的日期表达（未给年份时礼貌确认，勿自行假设）。可选项（人数、景点）未提供时，请直接生成不含这些字段的计划，不要向用户提问可选项；如需建议，用notes字段说明，勿使用ask。输出活动仅包含景点推荐，所有activities[].name必须为单一、标准化的中文景点官方名称，不得包含斜杠、顿号或并列名称；不输出time字段；需要说明从属关系或补充信息写入notes。`
+            return `当前北京时间：${s}。请参考该时间理解用户在本次消息中的日期表达（未给年份时礼貌确认，勿自行假设）。可选项（人数、景点）未提供时，请直接生成不含这些字段的计划，不要向用户提问可选项；如需建议，用notes字段说明，勿使用ask。输出活动仅包含景点推荐，不输出time字段；所有activities[].name必须为单一、标准化的中文景点官方名称，不得包含斜杠、顿号或并列名称；需要说明从属关系或补充信息写入notes。排期规则：若某景点适合全天游玩（如游乐园、爬山等），该天只安排这一个景点；若为城市打卡类（如寺庙、网红打卡地等），同一天安排约4个景点，保持相邻景点可步行或短途通勤。`
           })()
         })
       })
@@ -495,6 +623,99 @@ const sendMessage = async () => {
       if (idx1 !== undefined) {
         messages.value[idx1].travelSteps = [{ step: 1, status: 'completed', message: '需求分析完成' }]
         messages.value[idx1] = { ...messages.value[idx1] }
+      }
+
+      // 处理草稿更新
+      if (result.type === 'draft_update') {
+        // 更新草稿
+        if (result.draft) {
+          updateDraft(result.draft)
+        }
+
+        // 检查是否收集完成
+        if (result.is_complete) {
+          // 收集完成，显示确认消息
+          if (result.next_question) {
+            messages.value.push({
+              role: 'assistant',
+              content: [{ type: 'text', text: result.next_question }]
+            })
+          }
+
+          // 标记步骤1完成，显示步骤2开始
+          const idx1 = travelStepMsgMap.value[1]
+          if (idx1 !== undefined) {
+            messages.value[idx1].travelSteps = [{ step: 1, status: 'completed', message: '需求收集完成！' }]
+            messages.value[idx1] = { ...messages.value[idx1] }
+          }
+
+          messages.value.push({
+            role: 'assistant',
+            content: [],
+            travelSteps: [{ step: 2, status: 'running', message: '正在生成每日计划...' }]
+          })
+          travelStepMsgMap.value[2] = messages.value.length - 1
+
+          await scrollToBottom()
+          saveCurrentSession()
+
+          // 自动触发计划生成（发送特殊请求）
+          const planResponse = await fetch('http://localhost:9000/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [{
+                role: 'user',
+                content: [{ type: 'text', text: '__GENERATE_PLAN__' }]
+              }],
+              travel_draft: travelPlanDraft.value || undefined
+            })
+          })
+
+          if (!planResponse.ok) throw new Error('AI 响应失败')
+          const planResult = await planResponse.json()
+
+          // 处理生成的计划
+          if (planResult.type === 'daily_plan_json') {
+            const html = buildDailyPlanHtml(planResult)
+            messages.value.push({ role: 'assistant', content: [{ type: 'html', text: html }] })
+
+            const idx2 = travelStepMsgMap.value[2]
+            if (idx2 !== undefined) {
+              messages.value[idx2].travelSteps = [{ step: 2, status: 'completed', message: '每日计划生成完成！' }]
+              messages.value[idx2] = { ...messages.value[idx2] }
+            }
+
+            const msgIndex = messages.value.length - 1
+            const city = planResult?.plan?.destination || ''
+            const itinerary = planResult?.itinerary || []
+
+            // 渲染地图和路线
+            renderTravelMap(msgIndex, itinerary, city).then(coordsMap => {
+              return populateRoutesForMessage(msgIndex, city, coordsMap)
+            }).then(() => {
+              resetDraft()
+              saveCurrentSession()
+            }).catch(err => {
+              console.error('渲染失败:', err)
+              resetDraft()
+              saveCurrentSession()
+            })
+          }
+
+          return
+        }
+
+        // 收集未完成，显示追问消息
+        if (result.next_question) {
+          messages.value.push({
+            role: 'assistant',
+            content: [{ type: 'text', text: result.next_question }]
+          })
+        }
+
+        saveCurrentSession()
+        return
       }
 
       if (result.type === 'ask') {
@@ -511,8 +732,32 @@ const sendMessage = async () => {
         const idx2 = messages.value.length - 2
         messages.value[idx2].travelSteps = [{ step: 2, status: 'completed', message: '每日计划生成完成' }]
         messages.value[idx2] = { ...messages.value[idx2] }
-        await populateRoutesForMessage(messages.value.length - 1, result?.plan?.destination || '')
-        saveCurrentSession()
+
+        const msgIndex = messages.value.length - 1
+        // 🆕 优先使用LLM识别的城市名，降级使用destination（绝不能为空）
+        const city = result?.plan?.city || result?.plan?.destination
+        const itinerary = result?.itinerary || []
+
+        if (!city) {
+          console.error('❌ 缺少城市信息，无法查询公交路线')
+        }
+
+        console.log(`🏙️ 城市信息: ${city} (来源: ${result?.plan?.city ? 'LLM识别' : 'destination降级'})`)
+
+        // 优化：先获取坐标，再复用坐标（避免重复地理编码）
+        renderTravelMap(msgIndex, itinerary, city || '未知城市').then(coordsMap => {
+          // 使用已获取的坐标映射来计算路线，避免重复请求地理编码
+          return populateRoutesForMessage(msgIndex, city || '未知城市', coordsMap)
+        }).then(() => {
+          // 计划生成完成，重置草稿
+          resetDraft()
+          saveCurrentSession()
+        }).catch(err => {
+          console.error('渲染失败:', err)
+          resetDraft()
+          saveCurrentSession()
+        })
+
         return
       }
 
@@ -624,13 +869,77 @@ const sendMessage = async () => {
 
 // 旧的clearChat函数已被clearCurrentChat替代
 
+// ========== 草稿操作函数 ==========
 
+// 初始化草稿
+const initDraft = (initialData?: Partial<TravelPlanDraft>) => {
+  travelPlanDraft.value = {
+    destination: initialData?.destination || null,
+    origin: initialData?.origin || null,
+    start_date: initialData?.start_date || null,
+    end_date: initialData?.end_date || null,
+    people: initialData?.people || null,
+    attractions: initialData?.attractions || []
+  }
+  saveDraftToStorage()
+}
+
+// 更新草稿
+const updateDraft = (updates: Partial<TravelPlanDraft>) => {
+  if (!travelPlanDraft.value) {
+    initDraft(updates)
+  } else {
+    travelPlanDraft.value = {
+      ...travelPlanDraft.value,
+      ...updates
+    }
+    saveDraftToStorage()
+  }
+}
+
+// 重置草稿
+const resetDraft = () => {
+  travelPlanDraft.value = null
+  // 🆕 草稿现在跟会话绑定，保存会话即可
+  saveCurrentSession()
+}
+
+// 保存草稿（已改为会话级，自动保存到会话中）
+const saveDraftToStorage = () => {
+  // 🆕 草稿现在跟会话绑定，保存整个会话
+  saveCurrentSession()
+}
+
+// 从localStorage加载草稿（已废弃，改为从会话中加载）
+const loadDraftFromStorage = () => {
+  // 🆕 草稿现在从会话中加载，此函数已废弃
+  // 加载会话时会自动加载草稿（见 loadChatSession 函数）
+  console.log('⚠️ loadDraftFromStorage 已废弃，草稿现在跟会话绑定')
+}
+
+// 手动编辑草稿字段
+const editDraftField = (field: keyof TravelPlanDraft, value: any) => {
+  if (travelPlanDraft.value) {
+    travelPlanDraft.value[field] = value as never
+    saveDraftToStorage()
+  }
+}
+
+// 检测用户输入是否与旅行规划相关
+const isTravelRelated = (text: string): boolean => {
+  const keywords = ['旅行', '旅游', '规划', '计划', '行程', '出发', '目的地', '景点', '游玩', '去', '玩']
+  return keywords.some(keyword => text.includes(keyword))
+}
 
 const createNewChat = () => {
   console.log('创建新聊天被调用')
   const newChatId = Date.now().toString()
   currentChatId.value = newChatId
   messages.value = []
+
+  // 🆕 重置草稿（新会话应该是干净的）
+  travelPlanDraft.value = null
+  console.log('🗑️ 新会话，草稿已重置')
 
   // 清空输入框和选中的图片
   inputMessage.value = ''
@@ -655,9 +964,21 @@ const createNewChat = () => {
   // 不添加欢迎消息，显示开始页面
 }
 
-const loadChatSession = (session: ChatSession) => {
+const loadChatSession = async (session: ChatSession) => {
   currentChatId.value = session.id
   messages.value = [...session.messages]
+
+  // 🔄 加载该会话的草稿（会话级隔离）
+  travelPlanDraft.value = session.draft || null
+  console.log(`📋 加载会话 ${session.id} 的草稿:`, travelPlanDraft.value)
+
+  await nextTick()
+
+  // 🔄 重新渲染缓存的地图
+  await rerenderCachedMaps()
+
+  // 填充缓存的路线
+  await prefillRoutesFromCacheAll()
 }
 
 const deleteChatSession = (sessionId: string) => {
@@ -771,7 +1092,8 @@ const saveCurrentSession = () => {
     title,
     messages: [...messages.value],
     createdAt: existingIndex === -1 ? Date.now() : chatSessions.value[existingIndex].createdAt,
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    draft: travelPlanDraft.value  // 💾 保存当前会话的草稿
   }
 
   if (existingIndex === -1) {
@@ -824,20 +1146,52 @@ const buildDailyPlanHtml = (data: any) => {
     const plan = data?.plan || {}
     const itinerary = Array.isArray(data?.itinerary) ? data.itinerary : []
     const notes = data?.notes
+    const mapId = `map-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
     let html = `<div class="daily-plan">`
     html += `<div class="plan-header"><div class="plan-title">每日行程</div><div class="plan-meta">出发地：${plan.origin || '-'} ｜ 目的地：${plan.destination || '-'} ｜ 日期：${plan.start_date || '-'} 至 ${plan.end_date || '-'}</div></div>`
+
+    // 添加地图容器
+    html += `<div class="map-container">
+      <div class="map-header">
+        <svg class="map-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+        <span>路线地图</span>
+        <span class="map-status" data-map-id="${mapId}">加载中...</span>
+      </div>
+      <div id="${mapId}" class="travel-map" data-map-id="${mapId}"></div>
+    </div>`
+
+    // 行程卡片容器
+    html += `<div class="itinerary-container">`
     for (const day of itinerary) {
-      html += `<div class="day-card"><div class="day-title">${day.title || `Day ${day.day}`}（${day.date || ''}）</div>`
+      html += `<div class="day-card" data-day="${day.day}"><div class="day-title">${day.title || `Day ${day.day}`}（${day.date || ''}）</div>`
       if (Array.isArray(day.activities) && day.activities.length) {
         html += `<ul class="activities">`
         for (let i = 0; i < day.activities.length; i++) {
           const act = day.activities[i]
-          html += `<li class="activity"><span class="name">${act.name || ''}</span>${act.notes ? `<span class="notes">${act.notes}</span>` : ''}</li>`
+          const actName = String(act?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          html += `<li class="activity" data-spot="${actName}"><span class="name">${act.name || ''}</span>${act.notes ? `<span class="notes">${act.notes}</span>` : ''}</li>`
           if (i < day.activities.length - 1) {
             const next = day.activities[i + 1]
             const o = String(act?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             const d = String(next?.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            html += `<li class="route-chip" data-origin="${o}" data-destination="${d}">🚗 计算中 ></li>`
+            // 🆕 优先使用LLM识别的city字段，降级使用destination
+            const c = String(plan.city || plan.destination || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const routeId = `route-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            html += `
+              <li class="route-container">
+                <button class="route-chip" data-route-id="${routeId}" data-origin="${o}" data-destination="${d}" data-city="${c}">
+                  <span class="route-icon">🚗</span>
+                  <span class="route-text">计算中...</span>
+                  <span class="expand-icon">▼</span>
+                </button>
+                <div class="route-details" id="${routeId}" style="display: none;">
+                  <div class="route-loading">加载中...</div>
+                </div>
+              </li>`
           }
         }
         html += `</ul>`
@@ -845,7 +1199,7 @@ const buildDailyPlanHtml = (data: any) => {
         if (day.summary && String(day.summary).trim()) {
           html += `<ul class="activities">`
           const safeSummary = String(day.summary).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          html += `<li class="activity"><span class="time">全天</span><span class="name">当天安排</span><span class="notes">${safeSummary}</span></li>`
+          html += `<li class="activity"><span class="name">当天安排</span><span class="notes">${safeSummary}</span></li>`
           html += `</ul>`
         }
       }
@@ -854,6 +1208,8 @@ const buildDailyPlanHtml = (data: any) => {
       }
       html += `</div>`
     }
+    html += `</div>` // 关闭 itinerary-container
+
     if (notes) {
       html += `<div class="plan-notes">${notes}</div>`
     }
@@ -896,33 +1252,650 @@ const buildDailyPlanPreview = (buffer: string) => {
   }
 }
 
-// 填充路线芯片：基于相邻活动名称调用后端路线测试接口
-const populateRoutesForMessage = async (msgIndex: number, city: string) => {
+// 地图实例存储
+const travelMaps = new Map<string, any>()
+
+// 定义每天的路线颜色
+const DAY_COLORS = [
+  '#FF6B6B', // Day 1: 红色
+  '#4ECDC4', // Day 2: 青色
+  '#FFE66D', // Day 3: 黄色
+  '#95E1D3', // Day 4: 绿色
+  '#A8E6CF', // Day 5: 浅绿
+  '#FFD3B6', // Day 6: 橙色
+  '#FFAAA5', // Day 7: 粉色
+]
+
+// 渲染旅行地图，返回坐标映射供后续使用
+const renderTravelMap = async (msgIndex: number, itinerary: any[], city: string): Promise<Map<string, number[]>> => {
+  await nextTick()
+  const coordsMap = new Map<string, number[]>()
+
+  const wrappers = messagesContainer.value?.querySelectorAll('.message-wrapper') || []
+  const el = wrappers[msgIndex] as HTMLElement
+  if (!el) return coordsMap
+
+  const mapContainer = el.querySelector('.travel-map') as HTMLElement
+  if (!mapContainer) return coordsMap
+
+  const mapId = mapContainer.getAttribute('data-map-id') || ''
+  const mapStatus = el.querySelector(`.map-status[data-map-id="${mapId}"]`) as HTMLElement
+
+  try {
+    // 收集所有景点名称
+    const allPlaces: string[] = []
+    const daySpots: Array<{ day: number; spots: string[]; color: string }> = []
+
+    for (const day of itinerary) {
+      if (Array.isArray(day.activities) && day.activities.length) {
+        const spots = day.activities.map((act: any) => act.name).filter((name: string) => name)
+        daySpots.push({
+          day: day.day,
+          spots,
+          color: DAY_COLORS[(day.day - 1) % DAY_COLORS.length]
+        })
+        allPlaces.push(...spots)
+      }
+    }
+
+    if (allPlaces.length === 0) {
+      if (mapStatus) mapStatus.textContent = '无景点数据'
+      return coordsMap
+    }
+
+    // 批量获取地理编码
+    if (mapStatus) mapStatus.textContent = '获取坐标中...'
+    const response = await fetch('http://localhost:9000/api/batch-geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ places: allPlaces, city })
+    })
+
+    if (!response.ok) {
+      if (mapStatus) mapStatus.textContent = '坐标获取失败'
+      return coordsMap
+    }
+
+    const data = await response.json()
+    if (!data.success || !data.results) {
+      if (mapStatus) mapStatus.textContent = '坐标解析失败'
+      return coordsMap
+    }
+
+    // 构建景点坐标映射
+    for (const result of data.results) {
+      if (result.success && result.coords) {
+        coordsMap.set(result.name, result.coords)
+      }
+    }
+
+    // 计算地图中心点
+    const allCoords = Array.from(coordsMap.values())
+    if (allCoords.length === 0) {
+      if (mapStatus) mapStatus.textContent = '无有效坐标'
+      return coordsMap
+    }
+
+    const centerLng = allCoords.reduce((sum, c) => sum + c[0], 0) / allCoords.length
+    const centerLat = allCoords.reduce((sum, c) => sum + c[1], 0) / allCoords.length
+
+    // 创建地图
+    if (mapStatus) mapStatus.textContent = '渲染地图中...'
+
+    // @ts-ignore
+    if (!window.AMap) {
+      if (mapStatus) mapStatus.textContent = '地图API未加载'
+      return coordsMap
+    }
+
+    // @ts-ignore
+    const map = new AMap.Map(mapId, {
+      zoom: 12,
+      center: [centerLng, centerLat],
+      viewMode: '2D'
+    })
+
+    // 保存地图实例
+    travelMaps.set(mapId, map)
+
+    // 绘制每天的路线和标记
+    for (const dayInfo of daySpots) {
+      const dayCoords = dayInfo.spots
+        .map(spot => coordsMap.get(spot))
+        .filter((coords): coords is number[] => coords !== undefined)
+
+      if (dayCoords.length === 0) continue
+
+      // 绘制路线
+      if (dayCoords.length > 1) {
+        // @ts-ignore
+        const polyline = new AMap.Polyline({
+          path: dayCoords,
+          strokeColor: dayInfo.color,
+          strokeWeight: 4,
+          strokeOpacity: 0.8,
+          lineJoin: 'round',
+          lineCap: 'round'
+        })
+        map.add(polyline)
+      }
+
+      // 绘制标记
+      dayInfo.spots.forEach((spotName, index) => {
+        const coords = coordsMap.get(spotName)
+        if (!coords) return
+
+        // @ts-ignore
+        const marker = new AMap.Marker({
+          position: coords,
+          title: spotName,
+          label: {
+            content: `<div style="background: ${dayInfo.color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${index + 1}</div>`,
+            direction: 'top',
+            offset: [0, -5]
+          }
+        })
+
+        // 点击标记显示信息窗口
+        // @ts-ignore
+        marker.on('click', () => {
+          // @ts-ignore
+          const infoWindow = new AMap.InfoWindow({
+            content: `<div style="padding: 8px;"><h4 style="margin: 0 0 4px 0;">${spotName}</h4><p style="margin: 0; color: #666; font-size: 12px;">Day ${dayInfo.day}</p></div>`
+          })
+          infoWindow.open(map, coords)
+        })
+
+        map.add(marker)
+      })
+    }
+
+    // 自动调整视野
+    map.setFitView()
+
+    if (mapStatus) mapStatus.textContent = '✓ 已加载'
+
+    // 💾 保存地图数据到消息中（用于缓存和重新渲染）
+    if (messages.value[msgIndex]) {
+      const coordsRecord: Record<string, number[]> = {}
+      coordsMap.forEach((coords, name) => {
+        coordsRecord[name] = coords
+      })
+
+      messages.value[msgIndex].mapData = {
+        itinerary,
+        city,
+        coordsMap: coordsRecord,
+        mapId
+      }
+
+      // 保存到本地存储
+      saveCurrentSession()
+      console.log(`✅ 地图数据已缓存到消息 ${msgIndex}`)
+    }
+
+    return coordsMap
+  } catch (error) {
+    console.error('渲染地图失败:', error)
+    if (mapStatus) mapStatus.textContent = '渲染失败'
+    return coordsMap
+  }
+}
+
+// 🔄 重新渲染缓存的地图
+const rerenderCachedMaps = async () => {
+  await nextTick()
+
+  messages.value.forEach(async (message, msgIndex) => {
+    if (message.mapData) {
+      console.log(`🔄 检测到缓存的地图数据，准备重新渲染消息 ${msgIndex}`)
+
+      // 找到地图容器
+      const wrappers = messagesContainer.value?.querySelectorAll('.message-wrapper') || []
+      const el = wrappers[msgIndex] as HTMLElement
+      if (!el) {
+        console.warn(`⚠️ 未找到消息 ${msgIndex} 的DOM元素`)
+        return
+      }
+
+      const mapContainer = el.querySelector('.travel-map') as HTMLElement
+      if (!mapContainer) {
+        console.warn(`⚠️ 未找到消息 ${msgIndex} 的地图容器`)
+        return
+      }
+
+      const mapId = mapContainer.getAttribute('data-map-id') || ''
+      const mapStatus = el.querySelector(`.map-status[data-map-id="${mapId}"]`) as HTMLElement
+
+      try {
+        if (mapStatus) mapStatus.textContent = '正在恢复地图...'
+
+        // 从 mapData 恢复坐标映射
+        const coordsMap = new Map<string, number[]>()
+        Object.entries(message.mapData.coordsMap).forEach(([name, coords]) => {
+          coordsMap.set(name, coords)
+        })
+
+        const { itinerary, city } = message.mapData
+        const allCoords = Array.from(coordsMap.values())
+
+        if (allCoords.length === 0) {
+          if (mapStatus) mapStatus.textContent = '无有效坐标'
+          return
+        }
+
+        const centerLng = allCoords.reduce((sum, c) => sum + c[0], 0) / allCoords.length
+        const centerLat = allCoords.reduce((sum, c) => sum + c[1], 0) / allCoords.length
+
+        // @ts-ignore
+        if (!window.AMap) {
+          if (mapStatus) mapStatus.textContent = '地图API未加载'
+          return
+        }
+
+        // @ts-ignore
+        const map = new AMap.Map(mapId, {
+          zoom: 12,
+          center: [centerLng, centerLat],
+          viewMode: '2D'
+        })
+
+        // 保存地图实例
+        travelMaps.set(mapId, map)
+
+        // 绘制每天的路线和标记
+        const daySpots: Array<{ day: number; spots: string[]; color: string }> = []
+        for (const day of itinerary) {
+          if (Array.isArray(day.activities) && day.activities.length) {
+            const spots = day.activities.map((act: any) => act.name).filter((name: string) => name)
+            daySpots.push({
+              day: day.day,
+              spots,
+              color: DAY_COLORS[(day.day - 1) % DAY_COLORS.length]
+            })
+          }
+        }
+
+        for (const dayInfo of daySpots) {
+          const dayCoords = dayInfo.spots
+            .map(spot => coordsMap.get(spot))
+            .filter((coords): coords is number[] => coords !== undefined)
+
+          if (dayCoords.length === 0) continue
+
+          // 绘制路线
+          if (dayCoords.length > 1) {
+            // @ts-ignore
+            const polyline = new AMap.Polyline({
+              path: dayCoords,
+              strokeColor: dayInfo.color,
+              strokeWeight: 4,
+              strokeOpacity: 0.7,
+              lineJoin: 'round'
+            })
+            map.add(polyline)
+          }
+
+          // 绘制标记
+          dayInfo.spots.forEach((spotName, index) => {
+            const coords = coordsMap.get(spotName)
+            if (!coords) return
+
+            // @ts-ignore
+            const marker = new AMap.Marker({
+              position: coords,
+              title: spotName,
+              label: {
+                content: `<div style="background: ${dayInfo.color}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${index + 1}</div>`,
+                direction: 'top',
+                offset: [0, -5]
+              }
+            })
+
+            // @ts-ignore
+            marker.on('click', () => {
+              // @ts-ignore
+              const infoWindow = new AMap.InfoWindow({
+                content: `<div style="padding: 8px;"><h4 style="margin: 0 0 4px 0;">${spotName}</h4><p style="margin: 0; color: #666; font-size: 12px;">Day ${dayInfo.day}</p></div>`
+              })
+              infoWindow.open(map, coords)
+            })
+
+            map.add(marker)
+          })
+        }
+
+        map.setFitView()
+        if (mapStatus) mapStatus.textContent = '✓ 已恢复'
+        console.log(`✅ 地图 ${msgIndex} 重新渲染完成`)
+
+      } catch (error) {
+        console.error(`❌ 地图 ${msgIndex} 重新渲染失败:`, error)
+        if (mapStatus) mapStatus.textContent = '恢复失败'
+      }
+    }
+  })
+}
+
+// 填充路线芯片：基于相邻活动名称调用后端路线测试接口（支持多模式）
+const ROUTE_CACHE_KEY = 'route_cache_v2'  // 升级版本
+const readRouteCache = () => {
+  try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY) || '{}') } catch { return {} }
+}
+const writeRouteCache = (cache: Record<string, any>) => {
+  localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache))
+}
+const makeRouteKey = (city: string, origin: string, destination: string) => {
+  const c = (city || '').trim().toLowerCase()
+  const o = (origin || '').trim().toLowerCase()
+  const d = (destination || '').trim().toLowerCase()
+  return `${c}|${o}|${d}`
+}
+const getMultiModeRouteFromCache = (city: string, origin: string, destination: string) => {
+  const cache = readRouteCache()
+  const item = cache[makeRouteKey(city, origin, destination)]
+  if (!item) return null
+  if (Date.now() - item.ts > 7 * 24 * 3600 * 1000) return null
+  return item.routes  // 返回多模式路线数据
+}
+const setMultiModeRouteCache = (city: string, origin: string, destination: string, routes: any) => {
+  const cache = readRouteCache()
+  cache[makeRouteKey(city, origin, destination)] = { routes, ts: Date.now() }
+  writeRouteCache(cache)
+}
+
+const populateRoutesForMessage = async (msgIndex: number, city: string, coordsMap?: Map<string, number[]>) => {
   await nextTick()
   const wrappers = messagesContainer.value?.querySelectorAll('.message-wrapper') || []
   const el = wrappers[msgIndex] as HTMLElement
   if (!el) return
+
   const chips = el.querySelectorAll('.route-chip')
+
+  // 初始化消息级别的路线数据缓存
+  if (!messages.value[msgIndex].routesData) {
+    messages.value[msgIndex].routesData = {}
+  }
+  const messageRoutesCache = messages.value[msgIndex].routesData!
+
   for (const chip of Array.from(chips)) {
-    const origin = (chip as HTMLElement).getAttribute('data-origin') || ''
-    const destination = (chip as HTMLElement).getAttribute('data-destination') || ''
-    if (!origin || !destination) continue
+    const chipEl = chip as HTMLElement
+    const origin = chipEl.getAttribute('data-origin') || ''
+    const destination = chipEl.getAttribute('data-destination') || ''
+    const cityAttr = chipEl.getAttribute('data-city') || city
+    const routeId = chipEl.getAttribute('data-route-id') || ''
+
+    if (!origin || !destination || !routeId) continue
+
+    const routeKey = `${origin}->${destination}`
+
+    // 🔍 优先检查消息级缓存（避免重复API调用）
+    if (messageRoutesCache[routeKey]) {
+      console.log(`✅ 使用消息缓存: ${routeKey}`)
+      updateRouteDisplay(chipEl, routeId, messageRoutesCache[routeKey])
+      continue
+    }
+
+    // 🔍 检查localStorage缓存
+    const cachedRoutes = getMultiModeRouteFromCache(cityAttr, origin, destination)
+    if (cachedRoutes) {
+      console.log(`✅ 使用localStorage缓存: ${routeKey}`)
+      messageRoutesCache[routeKey] = cachedRoutes  // 同步到消息缓存
+      updateRouteDisplay(chipEl, routeId, cachedRoutes)
+      continue
+    }
+
+    // 🌐 调用API获取路线数据
     try {
-      const res = await fetch('http://localhost:9000/api/amap-route-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ origin_name: origin, destination_name: destination, city })
-      })
-      if (!res.ok) {
-        (chip as HTMLElement).textContent = '🚗 路线待确认 >'
-        continue
+      // 如果已有坐标映射，使用多模式路线API
+      if (coordsMap && coordsMap.has(origin) && coordsMap.has(destination)) {
+        const originCoords = coordsMap.get(origin)!
+        const destCoords = coordsMap.get(destination)!
+
+        console.log(`🌐 调用API: ${routeKey}`)
+
+        const res = await fetch('http://localhost:9000/api/multi-mode-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            origin_coords: originCoords,
+            destination_coords: destCoords,
+            origin_name: origin,
+            destination_name: destination,
+            city: cityAttr
+          })
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.success && data?.routes) {
+            // 💾 三层缓存：localStorage + 消息级 + 显示
+            setMultiModeRouteCache(cityAttr, origin, destination, data.routes)
+            messageRoutesCache[routeKey] = data.routes
+            updateRouteDisplay(chipEl, routeId, data.routes)
+
+            console.log(`💾 已缓存路线数据: ${routeKey}`)
+            continue
+          }
+        }
       }
-      const data = await res.json()
-      if (data?.success && data?.display) (chip as HTMLElement).textContent = data.display; else (chip as HTMLElement).textContent = '🚗 路线待确认 >'
-    } catch {
-      (chip as HTMLElement).textContent = '🚗 路线待确认 >'
+
+      // 降级：如果没有坐标，显示错误
+      const textEl = chipEl.querySelector('.route-text')
+      if (textEl) {
+        textEl.textContent = '路线待确认'
+      }
+    } catch (error) {
+      console.error('路线计算失败:', error)
+      const textEl = chipEl.querySelector('.route-text')
+      if (textEl) {
+        textEl.textContent = '路线待确认'
+      }
     }
   }
+
+  // 保存消息（包含路线缓存）
+  saveCurrentSession()
+
+  // 绑定展开/折叠事件
+  bindRouteExpandEvents(el)
+}
+
+// 更新路线显示
+const updateRouteDisplay = (chipEl: HTMLElement, routeId: string, routes: any) => {
+  // 更新按钮显示（默认显示驾车信息）
+  const textEl = chipEl.querySelector('.route-text')
+  if (textEl && routes.driving) {
+    textEl.textContent = routes.driving.display
+  }
+
+  // 生成详细信息HTML
+  const detailsContainer = document.getElementById(routeId)
+  if (detailsContainer) {
+    detailsContainer.innerHTML = buildRouteDetailsHtml(routes)
+  }
+}
+
+// 生成路线详情HTML（Google风格）
+const buildRouteDetailsHtml = (routes: any) => {
+  let html = '<div class="route-modes">'
+
+  // 驾车
+  if (routes.driving) {
+    html += `
+      <div class="route-mode active" data-mode="driving">
+        <div class="mode-header">
+          <span class="mode-icon">🚗</span>
+          <span class="mode-name">驾车</span>
+          <span class="mode-time">${routes.driving.duration_min}分钟</span>
+          <span class="mode-distance">${routes.driving.distance_km}km</span>
+        </div>
+        <div class="mode-content">
+          ${routes.driving.steps ? buildStepsHtml(routes.driving.steps, 'driving') : '<div class="no-steps">无详细路线</div>'}
+        </div>
+      </div>
+    `
+  }
+
+  // 步行
+  if (routes.walking) {
+    html += `
+      <div class="route-mode" data-mode="walking">
+        <div class="mode-header">
+          <span class="mode-icon">🚶</span>
+          <span class="mode-name">步行</span>
+          <span class="mode-time">${routes.walking.duration_min}分钟</span>
+          <span class="mode-distance">${routes.walking.distance_km}km</span>
+        </div>
+        <div class="mode-content" style="display: none;">
+          ${routes.walking.steps ? buildStepsHtml(routes.walking.steps, 'walking') : '<div class="no-steps">无详细路线</div>'}
+        </div>
+      </div>
+    `
+  }
+
+  // 公交
+  if (routes.transit) {
+    html += `
+      <div class="route-mode" data-mode="transit">
+        <div class="mode-header">
+          <span class="mode-icon">🚌</span>
+          <span class="mode-name">公交</span>
+          <span class="mode-time">${routes.transit.duration_min}分钟</span>
+          <span class="mode-distance">${routes.transit.distance_km}km</span>
+        </div>
+        <div class="mode-content" style="display: none;">
+          ${routes.transit.steps ? buildTransitStepsHtml(routes.transit.steps) : '<div class="no-steps">无详细路线</div>'}
+        </div>
+      </div>
+    `
+  }
+
+  html += '</div>'
+  return html
+}
+
+// 生成步骤HTML（驾车/步行）
+const buildStepsHtml = (steps: any[], mode: string) => {
+  if (!steps || steps.length === 0) return '<div class="no-steps">无详细路线</div>'
+
+  let html = '<div class="route-steps">'
+  steps.forEach((step, index) => {
+    html += `
+      <div class="route-step">
+        <div class="step-number">${index + 1}</div>
+        <div class="step-content">
+          <div class="step-instruction">${step.instruction || step.road || '前进'}</div>
+          ${step.distance ? `<div class="step-distance">${Math.round(parseInt(step.distance) / 1000 * 10) / 10}km</div>` : ''}
+        </div>
+      </div>
+    `
+  })
+  html += '</div>'
+  return html
+}
+
+// 生成公交步骤HTML
+const buildTransitStepsHtml = (steps: any[]) => {
+  if (!steps || steps.length === 0) return '<div class="no-steps">无公交方案</div>'
+
+  let html = '<div class="transit-steps">'
+  steps.forEach((step, index) => {
+    if (step.type === 'bus') {
+      html += `
+        <div class="transit-step bus-step">
+          <div class="step-icon">🚌</div>
+          <div class="step-content">
+            <div class="bus-line">${step.name}</div>
+            <div class="bus-stops">${step.via_stops}站</div>
+          </div>
+        </div>
+      `
+    } else if (step.type === 'walk' && step.distance > 0) {
+      html += `
+        <div class="transit-step walk-step">
+          <div class="step-icon">🚶</div>
+          <div class="step-content">
+            <div class="walk-distance">步行 ${step.distance}km</div>
+          </div>
+        </div>
+      `
+    }
+  })
+  html += '</div>'
+  return html
+}
+
+// 绑定路线展开/折叠事件
+const bindRouteExpandEvents = (container: HTMLElement) => {
+  // 绑定路线芯片点击事件
+  const chips = container.querySelectorAll('.route-chip')
+  chips.forEach(chip => {
+    chip.addEventListener('click', function(this: HTMLElement, e: Event) {
+      e.stopPropagation()
+      const chipEl = this
+      const routeId = chipEl.getAttribute('data-route-id')
+      const detailsEl = document.getElementById(routeId!)
+      const expandIcon = chipEl.querySelector('.expand-icon')
+
+      if (detailsEl) {
+        const isVisible = detailsEl.style.display !== 'none'
+        detailsEl.style.display = isVisible ? 'none' : 'block'
+        if (expandIcon) {
+          expandIcon.textContent = isVisible ? '▼' : '▲'
+        }
+        chipEl.classList.toggle('expanded', !isVisible)
+      }
+    })
+  })
+
+  // 绑定模式切换事件
+  const modeHeaders = container.querySelectorAll('.mode-header')
+  modeHeaders.forEach(header => {
+    header.addEventListener('click', function(this: HTMLElement) {
+      const modeEl = this.closest('.route-mode')
+      const allModes = modeEl?.parentElement?.querySelectorAll('.route-mode')
+      const content = modeEl?.querySelector('.mode-content')
+
+      if (allModes) {
+        allModes.forEach((m: Element) => {
+          m.classList.remove('active')
+          const c = m.querySelector('.mode-content') as HTMLElement
+          if (c) c.style.display = 'none'
+        })
+      }
+
+      if (modeEl && content) {
+        modeEl.classList.add('active')
+        ;(content as HTMLElement).style.display = 'block'
+      }
+    })
+  })
+}
+
+const prefillRoutesFromCacheAll = async () => {
+  await nextTick()
+  const chips = messagesContainer.value?.querySelectorAll('.route-chip') || []
+  for (const chip of Array.from(chips)) {
+    const chipEl = chip as HTMLElement
+    const origin = chipEl.getAttribute('data-origin') || ''
+    const destination = chipEl.getAttribute('data-destination') || ''
+    const cityAttr = chipEl.getAttribute('data-city') || ''
+    const routeId = chipEl.getAttribute('data-route-id') || ''
+
+    if (!origin || !destination || !routeId) continue
+
+    const cachedRoutes = getMultiModeRouteFromCache(cityAttr, origin, destination)
+    if (cachedRoutes) {
+      updateRouteDisplay(chipEl, routeId, cachedRoutes)
+    }
+  }
+
+  // 重新绑定事件
+  const containers = messagesContainer.value?.querySelectorAll('.message-wrapper') || []
+  containers.forEach(container => {
+    bindRouteExpandEvents(container as HTMLElement)
+  })
 }
 
 // 新增的侧边栏功能方法
@@ -964,15 +1937,17 @@ const openScholarGPT = () => {
 }
 
 onMounted(async () => {
+  // 🆕 草稿现在跟会话绑定，不需要单独加载
+
   // 加载聊天会话
   loadChatSessions()
 
-  // 如果有会话，加载最新的一个，否则创建新会话
+  // 如果有会话，加载最新的一个（会自动加载该会话的草稿），否则创建新会话
   if (chatSessions.value.length > 0) {
     const latestSession = chatSessions.value[0]
-    loadChatSession(latestSession)
+    await loadChatSession(latestSession)  // 这里会自动加载草稿、重新渲染地图和填充路线
   } else {
-    createNewChat()
+    createNewChat()  // 新会话，草稿为空
   }
 })
 </script>
@@ -1052,16 +2027,242 @@ onMounted(async () => {
   padding: 0;
   margin: 0;
 }
-.message-html :deep(.route-chip) {
-  display: inline-block;
+/* 🎨 路线容器 - Google风格 */
+.message-html :deep(.route-container) {
   margin: 8px 0;
+  list-style: none;
+}
+
+.message-html :deep(.route-chip) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: #F8F9FA;
+  border: 1px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #202124;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.message-html :deep(.route-chip:hover) {
+  background: #F1F3F4;
+  border-color: #DADCE0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.message-html :deep(.route-chip.expanded) {
   background: #E8F0FE;
-  color: #1a73e8;
-  border: 1px solid #D2E3FC;
-  border-radius: 10px;
-  padding: 6px 10px;
+  border-color: #1A73E8;
+  color: #1A73E8;
+}
+
+.message-html :deep(.route-icon) {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.message-html :deep(.route-text) {
+  flex: 1;
+  font-weight: 500;
+}
+
+.message-html :deep(.expand-icon) {
+  font-size: 10px;
+  color: #5F6368;
+  transition: transform 0.2s ease;
+}
+
+.message-html :deep(.route-chip.expanded .expand-icon) {
+  transform: rotate(180deg);
+}
+
+/* 路线详情面板 */
+.message-html :deep(.route-details) {
+  margin-top: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.message-html :deep(.route-loading) {
+  text-align: center;
+  color: #5F6368;
+  padding: 12px;
+}
+
+/* 路线模式选择 */
+.message-html :deep(.route-modes) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-html :deep(.route-mode) {
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.message-html :deep(.route-mode:hover) {
+  border-color: #DADCE0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.message-html :deep(.route-mode.active) {
+  border-color: #1A73E8;
+  background: #F8FBFF;
+}
+
+.message-html :deep(.mode-header) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: #FAFAFA;
+  transition: background 0.2s ease;
+}
+
+.message-html :deep(.route-mode.active .mode-header) {
+  background: #E8F0FE;
+}
+
+.message-html :deep(.mode-header:hover) {
+  background: #F1F3F4;
+}
+
+.message-html :deep(.mode-icon) {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.message-html :deep(.mode-name) {
+  font-weight: 600;
+  color: #202124;
+  font-size: 14px;
+}
+
+.message-html :deep(.mode-time) {
+  margin-left: auto;
+  font-weight: 600;
+  color: #1A73E8;
+  font-size: 14px;
+}
+
+.message-html :deep(.mode-distance) {
+  color: #5F6368;
+  font-size: 13px;
+}
+
+/* 路线步骤 */
+.message-html :deep(.mode-content) {
+  padding: 16px;
+  background: #FFFFFF;
+}
+
+.message-html :deep(.route-steps) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-html :deep(.route-step) {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.message-html :deep(.step-number) {
+  min-width: 24px;
+  height: 24px;
+  background: #1A73E8;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 600;
+  flex-shrink: 0;
+}
+
+.message-html :deep(.step-content) {
+  flex: 1;
+}
+
+.message-html :deep(.step-instruction) {
+  color: #202124;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.message-html :deep(.step-distance) {
+  color: #5F6368;
+  font-size: 12px;
+}
+
+/* 公交步骤 */
+.message-html :deep(.transit-steps) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-html :deep(.transit-step) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: #F8F9FA;
+  border-radius: 8px;
+}
+
+.message-html :deep(.bus-step) {
+  background: #E8F0FE;
+}
+
+.message-html :deep(.walk-step) {
+  background: #FEF7E0;
+}
+
+.message-html :deep(.step-icon) {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.message-html :deep(.bus-line) {
+  font-weight: 600;
+  color: #1A73E8;
+  font-size: 14px;
+}
+
+.message-html :deep(.bus-stops) {
+  color: #5F6368;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.message-html :deep(.walk-distance) {
+  color: #E37400;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.message-html :deep(.no-steps) {
+  text-align: center;
+  color: #9AA0A6;
+  padding: 16px;
+  font-size: 13px;
 }
 .message-html :deep(.activity) {
   display: flex;
@@ -1095,6 +2296,88 @@ onMounted(async () => {
 .message-html :deep(.notes) { color: #5F6368; flex-basis: 100%; margin-left: 0; }
 .message-html :deep(.day-summary) { margin-top: 8px; color: #3C4043; }
 .plan-notes { margin-top: 8px; font-size: 13px; color: #555; }
+
+/* 地图容器样式 - 大厂风格 */
+.message-html :deep(.map-container) {
+  background: #FFFFFF;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.08);
+  margin: 16px 0;
+  transition: all 0.3s ease;
+}
+
+.message-html :deep(.map-container:hover) {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 16px 48px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.message-html :deep(.map-header) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.message-html :deep(.map-icon) {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.message-html :deep(.map-status) {
+  margin-left: auto;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.message-html :deep(.travel-map) {
+  width: 100%;
+  height: 480px;
+  background: #f0f2f5;
+  position: relative;
+}
+
+/* 行程卡片容器 */
+.message-html :deep(.itinerary-container) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* 景点hover效果 */
+.message-html :deep(.activity[data-spot]) {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin: 0 -8px;
+  padding: 12px 8px;
+}
+
+.message-html :deep(.activity[data-spot]:hover) {
+  background: #F8F9FA;
+  transform: translateX(4px);
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .message-html :deep(.travel-map) {
+    height: 320px;
+  }
+
+  .message-html :deep(.map-header) {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+}
 
 /* 侧边栏样式 */
 .sidebar {
@@ -1285,6 +2568,185 @@ onMounted(async () => {
   padding: 16px 24px;
   background: white;
   color: #333;
+}
+
+/* 草稿进度条样式 - 大厂风格，与页面主题色协调 */
+.draft-progress-container {
+  background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+  padding: 20px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.draft-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+}
+
+.progress-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.progress-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.progress-percentage {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.draft-reset-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.draft-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.draft-reset-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.progress-bar-wrapper {
+  margin-bottom: 16px;
+}
+
+.progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #66bb6a 0%, #43a047 100%);
+  border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px rgba(102, 187, 106, 0.6);
+}
+
+.draft-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.draft-field {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.draft-field.filled {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.draft-field:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.field-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.field-icon.filled {
+  color: #66bb6a;
+}
+
+.field-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.field-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 4px;
+}
+
+.field-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 14px;
+  outline: none;
+  padding: 0;
+}
+
+.field-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.draft-missing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 193, 7, 0.25);
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+}
+
+.missing-icon {
+  font-size: 16px;
 }
 
 .header-left {

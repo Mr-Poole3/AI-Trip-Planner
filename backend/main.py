@@ -45,6 +45,71 @@ hotel_agent = HotelAgent()
 
 AMAP_KEY = os.environ.get("AMAP_KEY")
 
+def extract_first_json(text: str) -> dict:
+    """提取第一个有效的JSON对象（支持嵌套数组和对象）"""
+    # 1. 直接尝试解析
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    
+    # 2. 查找JSON对象（使用栈匹配括号，支持数组）
+    import re
+    start_idx = text.find('{')
+    if start_idx == -1:
+        return {"type": "chat", "content": text}
+    
+    # 使用栈来跟踪所有类型的括号
+    bracket_stack = []
+    in_string = False
+    escape = False
+    
+    for i in range(start_idx, len(text)):
+        char = text[i]
+        
+        if escape:
+            escape = False
+            continue
+            
+        if char == '\\':
+            escape = True
+            continue
+            
+        if char == '"':
+            in_string = not in_string
+            continue
+        
+        if not in_string:
+            if char == '{':
+                bracket_stack.append('{')
+            elif char == '[':
+                bracket_stack.append('[')
+            elif char == '}':
+                if bracket_stack and bracket_stack[-1] == '{':
+                    bracket_stack.pop()
+                    if len(bracket_stack) == 0:
+                        # 找到完整的JSON对象
+                        json_str = text[start_idx:i+1]
+                        try:
+                            return json.loads(json_str)
+                        except Exception as e:
+                            logger.error(f"JSON解析失败: {e}, 内容: {json_str[:200]}...")
+                            pass
+                        break
+            elif char == ']':
+                if bracket_stack and bracket_stack[-1] == '[':
+                    bracket_stack.pop()
+    
+    # 3. 如果栈匹配失败，尝试直接解析整个文本
+    try:
+        return json.loads(text)
+    except:
+        pass
+    
+    # 4. 返回原始内容作为聊天
+    logger.warning(f"无法解析JSON，返回聊天模式")
+    return {"type": "chat", "content": text}
+
 class TravelPlanRequest(BaseModel):
     message: str
 
@@ -57,10 +122,19 @@ class ChatMessage(BaseModel):
     role: str
     content: List[MessageContent]
 
+class TravelPlanDraft(BaseModel):
+    destination: Optional[str] = None
+    origin: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    people: Optional[int] = None
+    attractions: Optional[List[str]] = None
+
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     model: str = "doubao-1-5-thinking-vision-pro-250428"
     system_prompt: Optional[str] = None  # 系统提示词
+    travel_draft: Optional[TravelPlanDraft] = None  # 旅行计划草稿
 
 class ChatResponse(BaseModel):
     message: str
@@ -74,6 +148,26 @@ class RouteTestRequest(BaseModel):
     destination_name: str
     city: Optional[str] = None
     mode: Optional[str] = "driving"
+
+class BatchGeocodeRequest(BaseModel):
+    places: List[str]  # 景点名称列表
+    city: Optional[str] = None
+
+class RouteDirectRequest(BaseModel):
+    origin_coords: List[float]  # [lng, lat]
+    destination_coords: List[float]  # [lng, lat]
+    origin_name: Optional[str] = None
+    destination_name: Optional[str] = None
+    mode: Optional[str] = "driving"
+
+
+class MultiModeRouteRequest(BaseModel):
+    """一次性获取三种出行方式的路线"""
+    origin_coords: List[float]  # [lng, lat]
+    destination_coords: List[float]  # [lng, lat]
+    origin_name: Optional[str] = None
+    destination_name: Optional[str] = None
+    city: str  # 公交路线需要城市参数（必填，不能有默认值）
 
 
 @app.get("/")
@@ -323,17 +417,127 @@ async def chat(request: ChatRequest):
                 if last_user_text:
                     break
 
+        # 检查是否是生成计划的特殊请求
+        if last_user_text == "__GENERATE_PLAN__" and request.travel_draft:
+            draft = request.travel_draft.dict()
+            logger.info(f"📍 收到生成计划请求，草稿内容: {json.dumps(draft, ensure_ascii=False)}")
+            if draft.get("destination") and draft.get("origin") and draft.get("start_date") and draft.get("end_date"):
+                logger.info("✅ 必填字段验证通过，开始生成计划...")
+                
+                # 构建计划生成提示词
+                PLAN_GENERATION_PROMPT = (
+                    "你是专业的旅行规划师，根据用户需求生成详细的每日行程。\n"
+                    "\n【输出格式】严格JSON，无任何额外文字！\n"
+                    f"\n【用户需求】\n{json.dumps(draft, ensure_ascii=False, indent=2)}\n"
+                    "\n【任务】\n"
+                    "基于以上信息，生成完整的每日旅行计划。\n"
+                    "输出格式：{\"type\":\"daily_plan_json\",\"plan\":{...},\"itinerary\":[...]}\n"
+                    "\n【行程规划规则】\n"
+                    "1. 如果用户指定了景点（attractions），必须包含在行程中，但不局限于它们\n"
+                    "2. 如果用户没指定景点，你要根据目的地推荐热门景点\n"
+                    "3. 排期规则：\n"
+                    "   - 全天景点（游乐园/爬山等）：单独安排一天\n"
+                    "   - 城市打卡类（寺庙/博物馆等）：每天安排3-4个，保持相邻景点可步行或短途通勤\n"
+                    "4. 每天行程包含：\n"
+                    "   - day: 天数\n"
+                    "   - date: 日期（YYYY-MM-DD）\n"
+                    "   - title: 标题（如\"Day 1\"）\n"
+                    "   - activities: [{\"name\":\"景点名\", \"notes\":\"可选说明\"}]\n"
+                    "   - summary: 当天总结（交通方式、注意事项等）\n"
+                    "5. 活动名称必须是单一、标准化的中文景点官方名称\n"
+                    "6. plan字段包含：destination, origin, start_date, end_date, people（默认2），**city（必填）**\n"
+                    "\n【重要：城市识别】\n"
+                    "- 必须在plan中添加\"city\"字段\n"
+                    "- 分析目的地(destination)，提取所属的**城市名称**\n"
+                    "- 例如：destination=\"上海迪士尼\" → city=\"上海\"\n"
+                    "- 例如：destination=\"西湖\" → city=\"杭州\"\n"
+                    "- 例如：destination=\"北京\" → city=\"北京\"\n"
+                    "- city字段用于公交路线查询，必须是标准的城市名称（不带\"市\"字）\n"
+                    "\n再次强调：只输出JSON！"
+                )
+                
+                plan_messages = [
+                    {"role": "system", "content": PLAN_GENERATION_PROMPT},
+                    {"role": "user", "content": f"请为我规划{draft.get('destination')}的旅行，从{draft.get('start_date')}到{draft.get('end_date')}。"}
+                ]
+                
+                if request.system_prompt:
+                    plan_messages.insert(1, {"role": "system", "content": request.system_prompt})
+                
+                # 调用LLM生成计划
+                plan_resp = client.chat.completions.create(
+                    model=request.model,
+                    messages=plan_messages,
+                    temperature=0.7,
+                    max_tokens=4000,
+                )
+                
+                plan_raw = plan_resp.choices[0].message.content.strip()
+                logger.info(f"🤖 LLM返回原始内容长度: {len(plan_raw)} 字符")
+                logger.info(f"🤖 LLM返回原始内容（前500字符）: {plan_raw[:500]}...")
+                
+                plan_data = extract_first_json(plan_raw)
+                if plan_data:
+                    logger.info(f"📊 解析后的JSON类型: {plan_data.get('type')}")
+                else:
+                    logger.error(f"❌ JSON解析返回None！原始内容: {plan_raw}")
+                
+                # 返回生成的计划
+                if plan_data.get("type") == "daily_plan_json":
+                    logger.info("✅ 成功生成每日计划！")
+                    return {
+                        "type": "daily_plan_json",
+                        "plan": plan_data.get("plan", draft),
+                        "itinerary": plan_data.get("itinerary", []),
+                        "notes": plan_data.get("notes"),
+                        "corrections": plan_data.get("corrections"),
+                    }
+                else:
+                    logger.error(f"❌ 计划生成失败，返回类型错误: {plan_data.get('type')}")
+                    return {"type": "chat", "content": "计划生成失败，请重试"}
+
+        # 构建提示词 - 支持草稿模式
+        draft_info = ""
+        has_draft = request.travel_draft and any([
+            request.travel_draft.destination,
+            request.travel_draft.origin,
+            request.travel_draft.start_date,
+            request.travel_draft.end_date
+        ])
+        
+        if has_draft:
+            draft_dict = request.travel_draft.dict(exclude_none=True)
+            draft_info = f"\n\n【当前收集到的信息】（用户正在逐步提供）：\n{json.dumps(draft_dict, ensure_ascii=False, indent=2)}"
+        
         INTENT_PROMPT = (
-            "你是一位亲切、专业的旅行规划助手。只输出严格 JSON。\n"
-            "输出类型：\n"
-            "- 不需要规划：{\"type\": \"chat\", \"content\": \"...\"}\n"
-            "- 需要规划：根据信息完整度二选一：\n"
-            "  1) 必填（destination, origin, start_date, end_date）齐全：\n"
-            "     输出 {\"type\": \"daily_plan_json\", \"plan\": {\"destination\":..., \"origin\":..., \"start_date\":..., \"end_date\":..., \"people\": 可选, \"attractions\": 可选数组}, \"itinerary\": [ {\"day\":1, \"date\":\"YYYY-MM-DD\", \"title\":\"Day 1\", \"activities\":[{\"name\":\"...\", \"notes\":\"...\"}], \"summary\":\"...\" } ... ], \"notes\": 可选字符串, \"corrections\": 可选数组[{from,to,reason}] }。\n"
-            "  2) 缺少必填：仅在缺少必填时输出 {\"type\": \"ask\", \"question\": \"...\"}。\n"
-            "可选项（people, attractions）未提供时不要提问；若提供 attractions，必须纳入行程但不局限于它们。\n"
-            "不得编造具体票价/地址；日期用 YYYY-MM-DD。\n"
-            "所有 activities 仅包含景点名称与可选 notes，不输出 time 字段。活动的 name 必须是单一、标准化的中文景点官方名称，不得包含斜杠、顿号或并列名称；不要输出组合名称或模糊标签。示例：使用‘天守阁’或‘大阪城公园’之一，不要‘西之丸庭园/大阪城周边闲游’。如需要说明从属关系或补充信息，写入 notes。"
+            "你是旅行规划助手，职责：收集旅行必填信息。\n"
+            f"{draft_info}\n"
+            "\n【输出格式】严格JSON，无任何额外文字！\n"
+            "正确：{\"type\":\"chat\",\"content\":\"...\"}\n"
+            "错误：好的，{...}（不要任何前后文字）\n"
+            "\n【输出类型】\n"
+            "1. 普通聊天：{\"type\":\"chat\",\"content\":\"...\"}\n"
+            "2. 收集信息：{\"type\":\"draft_update\",\"updates\":{...},\"draft\":{...},\"missing_required\":[...],\"is_complete\":true/false,\"next_question\":\"...\"}\n"
+            "\n【核心规则 - 重要】\n"
+            "你只负责收集4个必填字段：\n"
+            "1. destination - 目的地城市\n"
+            "2. origin - 出发地城市\n"
+            "3. start_date - 开始日期（YYYY-MM-DD）\n"
+            "4. end_date - 结束日期（YYYY-MM-DD）\n"
+            "\n【可选字段 - 不要追问】\n"
+            "- people：人数（用户提到就记录，没提到就null）\n"
+            "- attractions：景点列表（用户提到就记录，没提到就null或[]）\n"
+            "❌ 绝对不要主动询问：\"还想去哪些景点\"、\"想去什么地方\"\n"
+            "✅ 用户没提景点很正常，我们会自动推荐\n"
+            "\n【判断完成】\n"
+            "当4个必填字段都有值时：\n"
+            "- 设置 is_complete = true\n"
+            "- next_question 可以是确认信息，如：\"好的，已收集完成！正在为您规划行程...\"\n"
+            "\n【合并逻辑】\n"
+            "- 提取用户新输入中的字段\n"
+            "- 与草稿合并（不覆盖已有非空字段）\n"
+            "- 缺少必填字段时，自然追问（只问缺的）\n"
+            "\n再次强调：只输出JSON！"
         )
 
         intent_messages = [{"role": "system", "content": INTENT_PROMPT}]
@@ -348,16 +552,37 @@ async def chat(request: ChatRequest):
             max_tokens=4000,
         )
         intent_raw = intent_resp.choices[0].message.content.strip()
-        try:
-            intent_data = json.loads(intent_raw)
-        except Exception:
-            import re
-            m = re.search(r"\{[\s\S]*\}", intent_raw)
-            intent_data = json.loads(m.group()) if m else {"type": "chat", "content": intent_raw}
+        logger.info(f"🤖 需求分析LLM返回长度: {len(intent_raw)} 字符")
+        logger.info(f"🤖 需求分析LLM返回（前500字符）: {intent_raw[:500]}...")
+        
+        # 健壮的JSON解析逻辑
+        intent_data = extract_first_json(intent_raw)
+        if intent_data:
+            logger.info(f"📊 解析后的意图类型: {intent_data.get('type')}")
+        else:
+            logger.error(f"❌ 需求分析JSON解析返回None！原始内容: {intent_raw}")
 
         itype = intent_data.get("type")
+        
+        # 草稿更新模式
+        if itype == "draft_update":
+            is_complete = intent_data.get("is_complete", False)
+            draft = intent_data.get("draft", {})
+            logger.info(f"📝 草稿更新 - 完成状态: {is_complete}, 草稿: {json.dumps(draft, ensure_ascii=False)}")
+            
+            # 返回草稿更新（即使完成也先返回，让前端展示进度）
+            return {
+                "type": "draft_update",
+                "updates": intent_data.get("updates", {}),
+                "draft": draft,
+                "missing_required": intent_data.get("missing_required", []),
+                "is_complete": is_complete,
+                "next_question": intent_data.get("next_question", ""),
+            }
+        
         if itype == "ask":
             return {"type": "ask", "content": intent_data.get("question", "请补充必填信息")}
+        
         if itype == "daily_plan_json":
             return {
                 "type": "daily_plan_json",
@@ -366,8 +591,10 @@ async def chat(request: ChatRequest):
                 "notes": intent_data.get("notes"),
                 "corrections": intent_data.get("corrections"),
             }
+        
         if itype == "plan_json":
             return {"type": "plan_json", "plan": intent_data.get("plan", {})}
+        
         if itype == "chat":
             content_txt = intent_data.get("content")
             if content_txt:
@@ -422,33 +649,242 @@ def _amap_geocode_sync(name: str, city: Optional[str] = None):
     return {"name": name, "location": loc}
 
 
-def _amap_direction_sync(origin_loc: str, dest_loc: str, mode: str = "driving"):
+def _amap_direction_sync(origin_loc: str, dest_loc: str, mode: str = "driving", city: str = None):
+    """获取路径规划（支持驾车、步行、公交）"""
     if not AMAP_KEY:
         raise RuntimeError("AMAP_KEY未设置")
+    
     if mode == "walking":
         path = "/v3/direction/walking"
         params = {"origin": origin_loc, "destination": dest_loc, "key": AMAP_KEY}
+    elif mode == "transit":
+        # 公交路线规划（使用动态城市参数）
+        if not city:
+            logger.warning("⚠️ 公交路线查询缺少城市参数")
+            return None
+        path = "/v3/direction/transit/integrated"
+        params = {
+            "origin": origin_loc, 
+            "destination": dest_loc, 
+            "key": AMAP_KEY,
+            "city": city,  # 🆕 使用动态传递的城市参数
+            "cityd": city
+        }
     else:
         path = "/v3/direction/driving"
         params = {"origin": origin_loc, "destination": dest_loc, "key": AMAP_KEY}
+    
     url = "https://restapi.amap.com" + path + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=10) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    if data.get("status") != "1":
-        return None
-    route = data.get("route") or {}
-    paths = route.get("paths") or []
-    if not paths:
-        return None
-    p0 = paths[0]
+    
     try:
-        dist_m = int(p0.get("distance", 0))
-        dur_s = int(p0.get("duration", 0))
-    except Exception:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        logger.error(f"高德API请求失败: {e}")
         return None
-    km = round(dist_m / 1000, 1)
-    minutes = max(1, round(dur_s / 60))
-    return {"distance_km": km, "duration_min": minutes}
+    
+    if data.get("status") != "1":
+        logger.error(f"高德API返回错误: {data.get('info')}")
+        return None
+    
+    # 解析不同模式的返回数据
+    if mode == "transit":
+        # 公交路线解析
+        route = data.get("route") or {}
+        transits = route.get("transits") or []
+        if not transits:
+            return None
+        t0 = transits[0]
+        try:
+            dist_m = int(t0.get("distance", 0))
+            dur_s = int(t0.get("duration", 0))
+            # 提取换乘信息
+            segments = t0.get("segments", [])
+            steps = []
+            for seg in segments:
+                bus_lines = seg.get("bus", {}).get("buslines", [])
+                if bus_lines:
+                    bus = bus_lines[0]
+                    steps.append({
+                        "type": "bus",
+                        "name": bus.get("name", "公交"),
+                        "via_stops": bus.get("via_num", 0)
+                    })
+                walking = seg.get("walking", {})
+                if walking and walking.get("distance"):
+                    walk_dist = int(walking.get("distance", 0))
+                    if walk_dist > 0:
+                        steps.append({
+                            "type": "walk",
+                            "distance": round(walk_dist / 1000, 2)
+                        })
+        except Exception as e:
+            logger.error(f"解析公交路线失败: {e}")
+            return None
+        
+        km = round(dist_m / 1000, 1)
+        minutes = max(1, round(dur_s / 60))
+        return {
+            "distance_km": km, 
+            "duration_min": minutes,
+            "steps": steps if mode == "transit" else None
+        }
+    else:
+        # 驾车/步行路线解析
+        route = data.get("route") or {}
+        paths = route.get("paths") or []
+        if not paths:
+            return None
+        p0 = paths[0]
+        try:
+            dist_m = int(p0.get("distance", 0))
+            dur_s = int(p0.get("duration", 0))
+        except Exception:
+            return None
+        km = round(dist_m / 1000, 1)
+        minutes = max(1, round(dur_s / 60))
+        
+        # 提取详细步骤（用于展开显示）- 显示完整步骤
+        steps = []
+        if mode in ["driving", "walking"]:
+            for step in p0.get("steps", []):  # 显示所有步骤
+                instruction = step.get("instruction", "")
+                road = step.get("road", "")
+                distance = step.get("distance", "")
+                if instruction or road:  # 只要有指引或道路名就显示
+                    steps.append({
+                        "instruction": instruction or f"沿{road}行驶",
+                        "road": road,
+                        "distance": distance
+                    })
+        
+        return {
+            "distance_km": km, 
+            "duration_min": minutes,
+            "steps": steps if steps else None
+        }
+
+
+@app.post("/api/batch-geocode")
+async def batch_geocode(req: BatchGeocodeRequest):
+    """批量获取景点地理编码"""
+    try:
+        loop = asyncio.get_event_loop()
+        def compute():
+            results = []
+            for place_name in req.places:
+                try:
+                    geo = _amap_geocode_sync(place_name, req.city)
+                    if geo and geo.get("location"):
+                        coords = [float(x) for x in geo["location"].split(",")]
+                        results.append({
+                            "name": place_name,
+                            "success": True,
+                            "coords": coords,  # [lng, lat]
+                            "address": geo.get("poi", place_name)
+                        })
+                    else:
+                        results.append({
+                            "name": place_name,
+                            "success": False,
+                            "error": "geocode_failed"
+                        })
+                except Exception as e:
+                    results.append({
+                        "name": place_name,
+                        "success": False,
+                        "error": str(e)
+                    })
+            return {"success": True, "results": results}
+        result = await loop.run_in_executor(None, compute)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/amap-route-direct")
+async def amap_route_direct(req: RouteDirectRequest):
+    """直接使用坐标计算路线（避免重复地理编码）"""
+    try:
+        loop = asyncio.get_event_loop()
+        def compute():
+            # 坐标格式转换：[lng, lat] -> "lng,lat"
+            origin_loc = f"{req.origin_coords[0]},{req.origin_coords[1]}"
+            dest_loc = f"{req.destination_coords[0]},{req.destination_coords[1]}"
+            
+            # 直接调用路线规划
+            drv = _amap_direction_sync(origin_loc, dest_loc, req.mode or "driving")
+            if not drv:
+                return {"success": False, "error": "direction_failed"}
+            
+            disp = f"🚗 {drv['distance_km']}km-{drv['duration_min']}分钟 >"
+            return {
+                "success": True,
+                "route": drv,
+                "display": disp,
+                "origin_name": req.origin_name,
+                "destination_name": req.destination_name
+            }
+        result = await loop.run_in_executor(None, compute)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/multi-mode-route")
+async def multi_mode_route(req: MultiModeRouteRequest):
+    """一次性获取三种出行方式（驾车、步行、公交）的路线"""
+    try:
+        loop = asyncio.get_event_loop()
+        def compute():
+            # 坐标格式转换
+            origin_loc = f"{req.origin_coords[0]},{req.origin_coords[1]}"
+            dest_loc = f"{req.destination_coords[0]},{req.destination_coords[1]}"
+            
+            results = {}
+            
+            # 1. 驾车路线
+            driving = _amap_direction_sync(origin_loc, dest_loc, "driving")
+            if driving:
+                results["driving"] = {
+                    "distance_km": driving["distance_km"],
+                    "duration_min": driving["duration_min"],
+                    "display": f"🚗 {driving['distance_km']}km · {driving['duration_min']}分钟",
+                    "steps": driving.get("steps")
+                }
+            
+            # 2. 步行路线
+            walking = _amap_direction_sync(origin_loc, dest_loc, "walking")
+            if walking:
+                results["walking"] = {
+                    "distance_km": walking["distance_km"],
+                    "duration_min": walking["duration_min"],
+                    "display": f"🚶 {walking['distance_km']}km · {walking['duration_min']}分钟",
+                    "steps": walking.get("steps")
+                }
+            
+            # 3. 公交路线（使用前端传递的城市参数）
+            transit = _amap_direction_sync(origin_loc, dest_loc, "transit", req.city)
+            if transit:
+                results["transit"] = {
+                    "distance_km": transit["distance_km"],
+                    "duration_min": transit["duration_min"],
+                    "display": f"🚌 {transit['distance_km']}km · {transit['duration_min']}分钟",
+                    "steps": transit.get("steps")
+                }
+            
+            return {
+                "success": True,
+                "origin_name": req.origin_name,
+                "destination_name": req.destination_name,
+                "routes": results
+            }
+        
+        result = await loop.run_in_executor(None, compute)
+        return result
+    except Exception as e:
+        logger.error(f"多模式路线规划失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/amap-route-test")
@@ -464,7 +900,18 @@ async def amap_route_test(req: RouteTestRequest):
             if not drv:
                 return {"success": False, "error": "direction_failed", "origin": o, "destination": d}
             disp = f"🚗 {drv['distance_km']}km-{drv['duration_min']}分钟 >"
-            return {"success": True, "origin": o, "destination": d, "route": drv, "display": disp}
+            # 解析经纬度坐标
+            origin_coords = [float(x) for x in o["location"].split(",")]
+            destination_coords = [float(x) for x in d["location"].split(",")]
+            return {
+                "success": True, 
+                "origin": o, 
+                "destination": d, 
+                "route": drv, 
+                "display": disp,
+                "origin_coords": origin_coords,  # [lng, lat]
+                "destination_coords": destination_coords  # [lng, lat]
+            }
         result = await loop.run_in_executor(None, compute)
         return result
     except Exception as e:
@@ -491,4 +938,4 @@ async def upload_image(file: UploadFile = File(...)):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+    uvicorn.run("main:app", host="0.0.0.0", port=9000, reload=True)
