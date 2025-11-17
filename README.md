@@ -334,17 +334,8 @@ A: 数据存储在 LocalStorage 中：
 ## 📧 联系方式
 
 如有问题或建议，欢迎联系：
-- 项目 Issue: [GitHub Issues](https://github.com/Mr-Poole3/AI-Trip-Planner)
+- 项目 Issue: [AI-Trip-Planner](https://github.com/Mr-Poole3/AI-Trip-Planner)
 - 邮箱: 2840269475@qq.com
-
-## 🙏 致谢
-
-- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
-- [FastAPI](https://fastapi.tiangolo.com/) - 现代 Python Web 框架
-- [豆包 AI](https://www.volcengine.com/product/doubao) - 强大的大语言模型
-- [高德地图](https://lbs.amap.com/) - 专业的地图服务
-- [OpenLayers](https://openlayers.org/) - 开源地图库
-- [Marked](https://marked.js.org/) - Markdown 解析器
 
 ---
 
