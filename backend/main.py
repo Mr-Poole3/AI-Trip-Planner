@@ -15,11 +15,6 @@ from hotel_agent import HotelAgent
 from pydantic import BaseModel
 import urllib.parse
 import urllib.request
-import sys
-
-# 🆕 Windows 兼容性：设置事件循环策略
-if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # 加载环境变量
 load_dotenv()
@@ -188,7 +183,7 @@ class ChatResponse(BaseModel):
 
 class HotelChatRequest(BaseModel):
     message: str
-    travel_plan: Optional[dict] = None  # 🆕 用户的旅行计划（如果有）
+    travel_plan: Optional[dict] = None  # 🆕 用户的旅行计划（可选）
 
 class RouteTestRequest(BaseModel):
     origin_name: str
@@ -231,6 +226,12 @@ async def hotel_chat(request: HotelChatRequest):
     try:
         async def generate_hotel_stream():
             try:
+                # 🆕 记录是否有旅行计划
+                if request.travel_plan:
+                    logger.info(f"📅 接收到旅行计划: {json.dumps(request.travel_plan, ensure_ascii=False)[:200]}...")
+                else:
+                    logger.info("📅 未提供旅行计划")
+                
                 # 步骤1: 意图识别
                 step1_running = json.dumps({'step': 1, 'status': 'running', 'message': '正在分析您的需求...'}, ensure_ascii=False)
                 logger.info(f"发送步骤1 running: {step1_running}")
@@ -240,10 +241,12 @@ async def hotel_chat(request: HotelChatRequest):
                 
                 # 在线程池中运行同步代码
                 loop = asyncio.get_event_loop()
-                # 🆕 传递旅行计划给意图识别
+                # 🆕 传递旅行计划到意图分析
                 intent_result = await loop.run_in_executor(
                     None, 
-                    lambda: hotel_agent.analyze_intent(request.message, request.travel_plan)
+                    hotel_agent.analyze_intent, 
+                    request.message, 
+                    request.travel_plan
                 )
                 
                 step1_completed = json.dumps({'step': 1, 'status': 'completed', 'message': '需求分析完成', 'data': intent_result}, ensure_ascii=False)
@@ -299,7 +302,7 @@ async def hotel_chat(request: HotelChatRequest):
                 yield ": ping\n\n"  # SSE 注释行，强制刷新
                 await asyncio.sleep(0.1)
                 
-                # 🆕 直接调用异步方法（不需要 executor）
+                # 执行异步酒店搜索
                 logger.info("开始执行酒店搜索...")
                 search_result = await hotel_agent.search_hotels(params)
                 logger.info(f"酒店搜索完成，结果: {search_result.get('success')}")
@@ -331,7 +334,7 @@ async def hotel_chat(request: HotelChatRequest):
 
                 # 真正的流式生成推荐
                 try:
-                    # 🆕 传递旅行计划给推荐生成器
+                    # 🆕 传递旅行计划到推荐生成
                     for chunk in hotel_agent.generate_recommendations(request.message, search_result, request.travel_plan):
                         if chunk:
                             yield f"data: {json.dumps({'type': 'recommendation_chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
@@ -347,6 +350,13 @@ async def hotel_chat(request: HotelChatRequest):
                 logger.info("推荐内容发送完成")
                 yield f"data: {json.dumps({'type': 'recommendation_end'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.1)
+                
+                # 🆕 发送完整的酒店列表数据（包括URL和图片），供前端显示酒店卡片
+                hotels_data = search_result.get("hotels", [])
+                logger.info(f"发送酒店列表数据，共 {len(hotels_data)} 家酒店")
+                yield f"data: {json.dumps({'type': 'hotels_data', 'hotels': hotels_data}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.1)
+                
                 yield f"data: {json.dumps({'step': 4, 'status': 'completed', 'message': '推荐生成完成'}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.1)
                 yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
@@ -1060,4 +1070,4 @@ async def upload_image(file: UploadFile = File(...)):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=9000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=9000)

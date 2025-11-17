@@ -182,13 +182,11 @@
                   </div>
                   <div class="step-info">
                     <div class="step-title">步骤 {{ step.step }}: {{ step.message }}</div>
-                    <div v-if="step.data" class="step-data">
-                      <pre>{{ JSON.stringify(step.data, null, 2) }}</pre>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
+            
             <!-- 旅行规划步骤展示 -->
             <div v-if="message.travelSteps && message.travelSteps.length" class="steps-container">
               <div v-for="(step, stepIndex) in message.travelSteps" :key="stepIndex" :class="['step-item', step.status]">
@@ -283,7 +281,45 @@
 
             <!-- 消息内容 -->
             <div v-for="(content, contentIndex) in message.content" :key="contentIndex">
-              <div v-if="content.type === 'text'" class="message-text markdown-body" v-html="renderMarkdown(content.text)"></div>
+              <!-- 🆕 文本内容 - 支持嵌入酒店卡片 -->
+              <template v-if="content.type === 'text'">
+                <div v-if="message.hotelsData && message.hotelsData.length">
+                  <!-- 解析文本并插入酒店卡片 -->
+                  <template v-for="(segment, segmentIndex) in parseTextWithHotelCards(content.text, message.hotelsData)" :key="segmentIndex">
+                    <div v-if="segment.type === 'text'" class="message-text markdown-body" v-html="renderMarkdown(segment.content)"></div>
+                    <div v-else-if="segment.type === 'hotel'" class="hotel-card-inline">
+                      <div class="hotel-card">
+                        <div v-if="segment.hotel.image" class="hotel-image-wrapper">
+                          <img :src="segment.hotel.image" :alt="segment.hotel.name" class="hotel-image" loading="lazy" />
+                        </div>
+                        <div class="hotel-info">
+                          <h3 class="hotel-name">{{ segment.hotel.name }}</h3>
+                          <div class="hotel-details">
+                            <div class="hotel-price">{{ segment.hotel.price }}</div>
+                            <div class="hotel-score">⭐ {{ segment.hotel.score }}</div>
+                          </div>
+                          <div class="hotel-location">📍 {{ segment.hotel.location }}</div>
+                          <div v-if="segment.hotel.facilities && segment.hotel.facilities.length" class="hotel-facilities">
+                            <span v-for="(facility, facilityIndex) in segment.hotel.facilities.slice(0, 3)" :key="facilityIndex" class="facility-tag">
+                              {{ facility }}
+                            </span>
+                          </div>
+                          <a 
+                            v-if="segment.hotel.url" 
+                            :href="segment.hotel.url" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            class="booking-btn"
+                          >
+                            立即预订 →
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <div v-else class="message-text markdown-body" v-html="renderMarkdown(content.text)"></div>
+              </template>
               <div v-else-if="content.type === 'html'" class="message-html" v-html="content.text"></div>
               <img v-if="content.type === 'image_url' && content.image_url" :src="content.image_url.url" class="message-image" />
             </div>
@@ -362,6 +398,17 @@ interface StepInfo {
   data?: any
 }
 
+// 🆕 酒店数据接口
+interface HotelData {
+  name: string
+  url?: string | null  // 🆕 预订页面URL
+  image?: string | null  // 🆕 酒店图片URL
+  price: string
+  score: string
+  location: string
+  facilities: string[]
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: MessageContent[]
@@ -369,6 +416,7 @@ interface Message {
   isStreaming?: boolean  // 是否正在流式接收
   toolCalls?: ToolCall[]  // 工具调用信息
   hotelSteps?: StepInfo[] // 酒店步骤
+  hotelsData?: HotelData[]  // 🆕 酒店列表数据（包含URL和图片）
   travelSteps?: StepInfo[] // 旅行步骤
   mapData?: MapData  // 地图数据（用于缓存和重新渲染）
   routesData?: Record<string, any>  // 🆕 路线数据缓存（避免重复API调用）
@@ -495,6 +543,57 @@ const renderMarkdown = (text: string | undefined) => {
   }
   // Fallback: 如果返回 Promise（未启用 async），同步返回原文的安全版本
   return DOMPurify.sanitize(text || '')
+}
+
+/**
+ * 🆕 解析文本中的酒店卡片占位符，将文本分割成文本段和酒店卡片段
+ * @param text 原始文本，包含 [HOTEL_CARD:X] 占位符
+ * @param hotelsData 酒店数据数组
+ * @returns 包含文本段和酒店段的数组
+ */
+const parseTextWithHotelCards = (text: string | undefined, hotelsData: HotelData[]) => {
+  if (!text) return [{ type: 'text', content: '' }]
+  
+  const segments: Array<{ type: 'text' | 'hotel', content?: string, hotel?: HotelData }> = []
+  
+  // 使用正则表达式匹配 [HOTEL_CARD:X] 占位符
+  const hotelCardRegex = /\[HOTEL_CARD:(\d+)\]/g
+  
+  let lastIndex = 0
+  let match
+  
+  while ((match = hotelCardRegex.exec(text)) !== null) {
+    // 添加占位符之前的文本
+    if (match.index > lastIndex) {
+      const textContent = text.substring(lastIndex, match.index)
+      if (textContent.trim()) {
+        segments.push({ type: 'text', content: textContent })
+      }
+    }
+    
+    // 添加酒店卡片
+    const hotelIndex = parseInt(match[1])
+    if (hotelIndex >= 0 && hotelIndex < hotelsData.length) {
+      segments.push({ type: 'hotel', hotel: hotelsData[hotelIndex] })
+    }
+    
+    lastIndex = match.index + match[0].length
+  }
+  
+  // 添加最后剩余的文本
+  if (lastIndex < text.length) {
+    const textContent = text.substring(lastIndex)
+    if (textContent.trim()) {
+      segments.push({ type: 'text', content: textContent })
+    }
+  }
+  
+  // 如果没有找到任何占位符，返回原始文本
+  if (segments.length === 0) {
+    segments.push({ type: 'text', content: text })
+  }
+  
+  return segments
 }
 
 // 过滤聊天历史
@@ -847,13 +946,21 @@ const sendMessage = async () => {
       const stepsIndex = messages.value.length - 1
       await scrollToBottom()
 
+      // 🆕 准备请求体，包含旅行计划（如果有）
+      const hotelRequestBody: any = { 
+        message: (content.find(c => c.type === 'text')?.text) || '' 
+      }
+      
+      // 如果有激活的旅行计划，传递给酒店搜索
+      if (currentActivePlan.value) {
+        hotelRequestBody.travel_plan = currentActivePlan.value
+        console.log('🏨 传递旅行计划到酒店搜索:', currentActivePlan.value)
+      }
+      
       const response = await fetch('http://localhost:9000/api/hotel-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: (content.find(c => c.type === 'text')?.text) || '',
-          travel_plan: currentActivePlan.value || undefined  // 🆕 发送当前激活的旅行计划
-        })
+        body: JSON.stringify(hotelRequestBody)
       })
       if (!response.ok) throw new Error('酒店搜索失败')
       const reader = response.body?.getReader()
@@ -898,6 +1005,16 @@ const sendMessage = async () => {
                   const msg = messages.value[recommendationIndex]
                   msg.isStreaming = false
                   messages.value[recommendationIndex] = { ...msg }
+                }
+              } else if (data.type === 'hotels_data') {
+                // 🆕 接收酒店列表数据（包含URL和图片）
+                console.log('📦 接收到酒店列表数据:', data.hotels)
+                if (recommendationIndex !== null) {
+                  const msg = messages.value[recommendationIndex]
+                  msg.hotelsData = data.hotels
+                  messages.value[recommendationIndex] = { ...msg }
+                  await nextTick()
+                  await scrollToBottom()
                 }
               } else if (data.type === 'final_response') {
                 messages.value.push({ role: 'assistant', content: [{ type: 'text', text: data.content }] })
@@ -4004,8 +4121,138 @@ onMounted(async () => {
 .step-icon { font-size: 18px; flex-shrink: 0; }
 .step-info { flex: 1; }
 .step-title { font-weight: 600; color: #333; margin-bottom: 5px; }
-.step-data { margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-size: 12px; }
-.step-data pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* 🆕 酒店卡片展示样式 */
+.hotel-card-inline {
+  margin: 16px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.hotel-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  max-width: 400px;
+  width: 100%;
+}
+
+.hotel-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.hotel-image-wrapper {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.hotel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.hotel-card:hover .hotel-image {
+  transform: scale(1.05);
+}
+
+.hotel-info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.hotel-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hotel-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.hotel-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #007bff;
+}
+
+.hotel-score {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f39c12;
+}
+
+.hotel-location {
+  font-size: 14px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hotel-facilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.facility-tag {
+  font-size: 12px;
+  padding: 4px 10px;
+  background: #e8f4f8;
+  color: #007bff;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.booking-btn {
+  display: inline-block;
+  width: 100%;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s;
+  margin-top: auto;
+}
+
+.booking-btn:hover {
+  background: linear-gradient(135deg, #0056b3 0%, #003d82 100%);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .hotel-card {
+    max-width: 100%;
+  }
+  
+  .hotel-image-wrapper {
+    height: 200px;
+  }
+}
 </style>
 const populateRoutesForMessage = async (msgIndex: number, city: string) => {
   await nextTick()
