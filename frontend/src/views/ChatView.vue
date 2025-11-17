@@ -132,7 +132,7 @@
         <!-- 开始页面 - 当没有消息时显示 -->
         <div v-if="messages.length === 0" class="start-page">
           <div class="start-content">
-            <h1 class="start-title">您在忙什么？</h1>
+            <h1 class="start-title">开始一段旅行✈️</h1>
             <div class="start-input-wrapper">
               <input
                 v-model="inputMessage"
@@ -186,7 +186,7 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- 旅行规划步骤展示 -->
             <div v-if="message.travelSteps && message.travelSteps.length" class="steps-container">
               <div v-for="(step, stepIndex) in message.travelSteps" :key="stepIndex" :class="['step-item', step.status]">
@@ -287,35 +287,37 @@
                   <!-- 解析文本并插入酒店卡片 -->
                   <template v-for="(segment, segmentIndex) in parseTextWithHotelCards(content.text, message.hotelsData)" :key="segmentIndex">
                     <div v-if="segment.type === 'text'" class="message-text markdown-body" v-html="renderMarkdown(segment.content)"></div>
-                    <div v-else-if="segment.type === 'hotel'" class="hotel-card-inline">
-                      <div class="hotel-card">
-                        <div v-if="segment.hotel.image" class="hotel-image-wrapper">
-                          <img :src="segment.hotel.image" :alt="segment.hotel.name" class="hotel-image" loading="lazy" />
-                        </div>
-                        <div class="hotel-info">
-                          <h3 class="hotel-name">{{ segment.hotel.name }}</h3>
-                          <div class="hotel-details">
-                            <div class="hotel-price">{{ segment.hotel.price }}</div>
-                            <div class="hotel-score">⭐ {{ segment.hotel.score }}</div>
+                    <template v-else-if="isHotelSegment(segment)">
+                      <div class="hotel-card-inline">
+                        <div class="hotel-card">
+                          <div v-if="segment.hotel.image" class="hotel-image-wrapper">
+                            <img :src="segment.hotel.image" :alt="segment.hotel.name" class="hotel-image" loading="lazy" />
                           </div>
-                          <div class="hotel-location">📍 {{ segment.hotel.location }}</div>
-                          <div v-if="segment.hotel.facilities && segment.hotel.facilities.length" class="hotel-facilities">
-                            <span v-for="(facility, facilityIndex) in segment.hotel.facilities.slice(0, 3)" :key="facilityIndex" class="facility-tag">
-                              {{ facility }}
-                            </span>
+                          <div class="hotel-info">
+                            <h3 class="hotel-name">{{ segment.hotel.name }}</h3>
+                            <div class="hotel-details">
+                              <div class="hotel-price">{{ segment.hotel.price }}</div>
+                              <div class="hotel-score">⭐ {{ segment.hotel.score }}</div>
+                            </div>
+                            <div class="hotel-location">📍 {{ segment.hotel.location }}</div>
+                            <div v-if="segment.hotel.facilities && segment.hotel.facilities.length" class="hotel-facilities">
+                              <span v-for="(facility, facilityIndex) in segment.hotel.facilities.slice(0, 3)" :key="facilityIndex" class="facility-tag">
+                                {{ facility }}
+                              </span>
+                            </div>
+                            <a
+                              v-if="segment.hotel.url"
+                              :href="segment.hotel.url"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="booking-btn"
+                            >
+                              立即预订 →
+                            </a>
                           </div>
-                          <a 
-                            v-if="segment.hotel.url" 
-                            :href="segment.hotel.url" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            class="booking-btn"
-                          >
-                            立即预订 →
-                          </a>
                         </div>
                       </div>
-                    </div>
+                    </template>
                   </template>
                 </div>
                 <div v-else class="message-text markdown-body" v-html="renderMarkdown(content.text)"></div>
@@ -551,17 +553,26 @@ const renderMarkdown = (text: string | undefined) => {
  * @param hotelsData 酒店数据数组
  * @returns 包含文本段和酒店段的数组
  */
-const parseTextWithHotelCards = (text: string | undefined, hotelsData: HotelData[]) => {
+type TextSegment = { type: 'text', content: string }
+type HotelSegment = { type: 'hotel', hotel: HotelData }
+type Segment = TextSegment | HotelSegment
+
+// 类型守卫函数
+const isHotelSegment = (segment: Segment): segment is HotelSegment => {
+  return segment.type === 'hotel'
+}
+
+const parseTextWithHotelCards = (text: string | undefined, hotelsData: HotelData[]): Segment[] => {
   if (!text) return [{ type: 'text', content: '' }]
-  
-  const segments: Array<{ type: 'text' | 'hotel', content?: string, hotel?: HotelData }> = []
-  
+
+  const segments: Segment[] = []
+
   // 使用正则表达式匹配 [HOTEL_CARD:X] 占位符
   const hotelCardRegex = /\[HOTEL_CARD:(\d+)\]/g
-  
+
   let lastIndex = 0
   let match
-  
+
   while ((match = hotelCardRegex.exec(text)) !== null) {
     // 添加占位符之前的文本
     if (match.index > lastIndex) {
@@ -570,16 +581,16 @@ const parseTextWithHotelCards = (text: string | undefined, hotelsData: HotelData
         segments.push({ type: 'text', content: textContent })
       }
     }
-    
+
     // 添加酒店卡片
     const hotelIndex = parseInt(match[1])
     if (hotelIndex >= 0 && hotelIndex < hotelsData.length) {
       segments.push({ type: 'hotel', hotel: hotelsData[hotelIndex] })
     }
-    
+
     lastIndex = match.index + match[0].length
   }
-  
+
   // 添加最后剩余的文本
   if (lastIndex < text.length) {
     const textContent = text.substring(lastIndex)
@@ -587,12 +598,12 @@ const parseTextWithHotelCards = (text: string | undefined, hotelsData: HotelData
       segments.push({ type: 'text', content: textContent })
     }
   }
-  
+
   // 如果没有找到任何占位符，返回原始文本
   if (segments.length === 0) {
     segments.push({ type: 'text', content: text })
   }
-  
+
   return segments
 }
 
@@ -947,16 +958,16 @@ const sendMessage = async () => {
       await scrollToBottom()
 
       // 🆕 准备请求体，包含旅行计划（如果有）
-      const hotelRequestBody: any = { 
-        message: (content.find(c => c.type === 'text')?.text) || '' 
+      const hotelRequestBody: any = {
+        message: (content.find(c => c.type === 'text')?.text) || ''
       }
-      
+
       // 如果有激活的旅行计划，传递给酒店搜索
       if (currentActivePlan.value) {
         hotelRequestBody.travel_plan = currentActivePlan.value
         console.log('🏨 传递旅行计划到酒店搜索:', currentActivePlan.value)
       }
-      
+
       const response = await fetch('http://localhost:9000/api/hotel-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4248,7 +4259,7 @@ onMounted(async () => {
   .hotel-card {
     max-width: 100%;
   }
-  
+
   .hotel-image-wrapper {
     height: 200px;
   }

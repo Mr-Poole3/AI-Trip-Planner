@@ -121,12 +121,24 @@ interface MessageContent {
   image_url?: { url: string }
 }
 
+// 🆕 酒店数据接口
+interface HotelData {
+  name: string
+  url?: string | null      // 🆕 预订页面URL
+  image?: string | null    // 🆕 酒店图片URL
+  price: string
+  score: string
+  location: string
+  facilities: string[]
+}
+
 // 消息结构
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: MessageContent[] | string
   mapData?: MapData          // 地图数据缓存
   routesData?: RoutesDataMap // 路线数据缓存
+  hotelsData?: HotelData[]   // 🆕 酒店列表数据（包含URL和图片）
 }
 
 // 地图数据
@@ -398,6 +410,103 @@ function saveSessions() {
 }
 ```
 
+##### 3.5 酒店卡片嵌入渲染 🆕
+
+```typescript
+// 类型定义
+type TextSegment = { type: 'text', content: string }
+type HotelSegment = { type: 'hotel', hotel: HotelData }
+type Segment = TextSegment | HotelSegment
+
+// 类型守卫函数
+const isHotelSegment = (segment: Segment): segment is HotelSegment => {
+  return segment.type === 'hotel'
+}
+
+/**
+ * 解析文本中的酒店卡片占位符
+ * LLM 输出格式：推荐文本 + [HOTEL_CARD:0] + 推荐文本 + [HOTEL_CARD:1]
+ */
+const parseTextWithHotelCards = (
+  text: string | undefined, 
+  hotelsData: HotelData[]
+): Segment[] => {
+  if (!text) return [{ type: 'text', content: '' }]
+  
+  const segments: Segment[] = []
+  const hotelCardRegex = /\[HOTEL_CARD:(\d+)\]/g
+  
+  let lastIndex = 0
+  let match
+  
+  while ((match = hotelCardRegex.exec(text)) !== null) {
+    // 添加占位符之前的文本
+    if (match.index > lastIndex) {
+      const textContent = text.substring(lastIndex, match.index)
+      if (textContent.trim()) {
+        segments.push({ type: 'text', content: textContent })
+      }
+    }
+    
+    // 添加酒店卡片
+    const hotelIndex = parseInt(match[1])
+    if (hotelIndex >= 0 && hotelIndex < hotelsData.length) {
+      segments.push({ type: 'hotel', hotel: hotelsData[hotelIndex] })
+    }
+    
+    lastIndex = match.index + match[0].length
+  }
+  
+  // 添加最后剩余的文本
+  if (lastIndex < text.length) {
+    const textContent = text.substring(lastIndex)
+    if (textContent.trim()) {
+      segments.push({ type: 'text', content: textContent })
+    }
+  }
+  
+  return segments.length > 0 ? segments : [{ type: 'text', content: text }]
+}
+
+// 模板渲染
+<template v-for="(segment, segmentIndex) in parseTextWithHotelCards(content.text, message.hotelsData)">
+  <!-- 文本段：Markdown 渲染 -->
+  <div v-if="segment.type === 'text'" 
+       class="message-text markdown-body" 
+       v-html="renderMarkdown(segment.content)">
+  </div>
+  
+  <!-- 酒店段：显示酒店卡片 -->
+  <template v-else-if="isHotelSegment(segment)">
+    <div class="hotel-card-inline">
+      <div class="hotel-card">
+        <img v-if="segment.hotel.image" 
+             :src="segment.hotel.image" 
+             :alt="segment.hotel.name" />
+        <div class="hotel-info">
+          <h3>{{ segment.hotel.name }}</h3>
+          <div class="hotel-price">{{ segment.hotel.price }}</div>
+          <div class="hotel-score">⭐ {{ segment.hotel.score }}</div>
+          <div class="hotel-location">📍 {{ segment.hotel.location }}</div>
+          <a v-if="segment.hotel.url" 
+             :href="segment.hotel.url" 
+             target="_blank"
+             class="booking-btn">
+            立即预订 →
+          </a>
+        </div>
+      </div>
+    </div>
+  </template>
+</template>
+```
+
+**关键特性**：
+- **占位符解析**：使用正则表达式匹配 `[HOTEL_CARD:X]` 占位符
+- **类型安全**：使用 TypeScript 联合类型和类型守卫确保类型安全
+- **无缝嵌入**：酒店卡片嵌入到推荐文本的对应位置，而非统一显示在末尾
+- **响应式设计**：酒店卡片支持响应式布局，适配不同屏幕尺寸
+
 ---
 
 ## 后端架构
@@ -407,8 +516,8 @@ function saveSessions() {
 ```
 backend/
 ├── main.py                 # 主应用（FastAPI）
-├── hotel_agent.py          # 酒店推荐代理
-└── booking_hotel_search.py # Booking.com 爬虫
+├── hotel_agent.py          # 酒店推荐代理（意图分析、推荐生成）
+└── booking_hotel_search.py # Booking.com 爬虫（酒店搜索、数据提取）
 ```
 
 ### 核心模块：main.py
@@ -749,6 +858,203 @@ def _amap_direction_sync(
     }
 ```
 
+#### 5. 酒店推荐模块
+
+##### 5.1 酒店搜索（booking_hotel_search.py）
+
+```python
+async def search_hotel(
+    destination: str,
+    checkin_date: Optional[str] = None,
+    checkout_date: Optional[str] = None,
+    adults: int = 2,
+    children: int = 0,
+    rooms: int = 1
+) -> Dict:
+    """
+    使用 Playwright 自动化搜索 Booking.com 酒店
+    
+    返回数据结构：
+    {
+        "success": bool,
+        "hotels": [
+            {
+                "name": "酒店名称",
+                "url": "https://booking.cn/hotel/...",  # 🆕 预订页面URL
+                "image": "https://cf.bstatic.com/...",  # 🆕 酒店图片URL
+                "price": "¥ 1,500",
+                "score": "9.2",
+                "location": "位置信息",
+                "facilities": ["WiFi", "停车场"]
+            }
+        ],
+        "error": Optional[str]
+    }
+    """
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=False)
+        page = await browser.new_page()
+        
+        # 1. 访问 Booking.com
+        await page.goto("https://booking.cn/index.zh-cn.html")
+        
+        # 2. 处理 Cookie 弹窗
+        await handle_cookie_consent(page)
+        
+        # 3. 输入搜索条件
+        await page.get_by_role("combobox", name="目的地？").fill(destination)
+        # ... 设置日期、人数等
+        
+        # 4. 点击搜索
+        await page.get_by_role("button", name="搜特价").click()
+        
+        # 5. 等待结果加载
+        await page.wait_for_selector('[data-testid="property-card"]')
+        
+        # 6. 提取酒店信息
+        hotels = await page.locator('[data-testid="property-card"]').all()
+        for hotel in hotels[:10]:
+            hotel_info = {}
+            # 提取名称
+            hotel_info["name"] = await hotel.locator('[data-testid="title"]').inner_text()
+            
+            # 🆕 提取预订URL
+            url_element = hotel.locator('a[data-testid="title-link"]').first
+            hotel_url = await url_element.get_attribute('href')
+            if hotel_url and not hotel_url.startswith('http'):
+                hotel_url = f"https://booking.cn{hotel_url}"
+            hotel_info["url"] = hotel_url
+            
+            # 🆕 提取图片URL
+            img_element = hotel.locator('img').first
+            hotel_info["image"] = await img_element.get_attribute('src')
+            
+            # 提取价格、评分、位置等
+            # ...
+        
+        await browser.close()
+        return result
+```
+
+##### 5.2 酒店推荐代理（hotel_agent.py）
+
+```python
+class HotelAgent:
+    """智能酒店推荐代理"""
+    
+    def analyze_intent(self, user_message: str, travel_plan: Optional[Dict] = None) -> Dict:
+        """
+        分析用户意图并提取参数
+        
+        🆕 支持从旅行计划中提取信息：
+        - 当用户提到"第X天"时，从计划中提取对应日期和景点
+        - 自动推断合适的酒店位置
+        """
+        # 如果有旅行计划，添加到提示词中
+        if travel_plan:
+            travel_plan_json = json.dumps(travel_plan, ensure_ascii=False)
+            user_content = f"""用户消息：{user_message}
+            
+【用户的旅行计划】
+{travel_plan_json}
+"""
+        
+        response = self.client.chat.completions.create(...)
+        return json.loads(response.choices[0].message.content)
+    
+    async def search_hotels(self, params: Dict) -> Dict:
+        """异步搜索酒店"""
+        return await search_hotel(
+            destination=params.get("destination"),
+            checkin_date=params.get("checkin_date"),
+            checkout_date=params.get("checkout_date"),
+            adults=params.get("adults", 2)
+        )
+    
+    def generate_recommendations(
+        self, 
+        user_message: str, 
+        search_result: Dict, 
+        travel_plan: Optional[Dict] = None
+    ):
+        """
+        生成酒店推荐（流式输出）
+        
+        🆕 关键特性：
+        1. LLM 在推荐文本中插入占位符 [HOTEL_CARD:X]
+        2. X 是酒店在列表中的索引（0, 1, 2...）
+        3. 占位符必须单独占一行
+        4. 前端解析占位符并替换为实际酒店卡片
+        """
+        RECOMMENDATION_SYSTEM_PROMPT = """
+        ...
+        🎯 重要：酒店卡片占位符使用规则
+        - 在推荐每个酒店时，在推荐理由段落的**最后**添加占位符 [HOTEL_CARD:X]
+        - X 是酒店在列表中的索引（从0开始）
+        - 占位符必须单独占一行
+        
+        示例：
+        1. 上海国际旅游度假区智选假日酒店
+        价格：HK$ 518
+        推荐理由：...
+        [HOTEL_CARD:0]
+        """
+        
+        stream = self.client.chat.completions.create(
+            model="doubao-1-5-thinking-vision-pro-250428",
+            messages=[...],
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+```
+
+##### 5.3 SSE 流式响应（main.py）
+
+```python
+@app.post("/api/hotel-chat")
+async def hotel_chat(request: HotelChatRequest):
+    """酒店推荐接口（SSE流式）"""
+    
+    async def generate_hotel_stream():
+        # 步骤1: 意图分析
+        yield f"data: {json.dumps({'step': 1, 'status': 'running'})}\n\n"
+        intent_result = await hotel_agent.analyze_intent(
+            request.message, 
+            request.travel_plan  # 🆕 传递旅行计划
+        )
+        yield f"data: {json.dumps({'step': 1, 'status': 'completed'})}\n\n"
+        
+        # 步骤2: 参数验证
+        # ...
+        
+        # 步骤3: 搜索酒店
+        search_result = await hotel_agent.search_hotels(params)
+        yield f"data: {json.dumps({'step': 3, 'status': 'completed'})}\n\n"
+        
+        # 步骤4: 生成推荐（流式）
+        yield f"data: {json.dumps({'type': 'recommendation_start'})}\n\n"
+        
+        for chunk in hotel_agent.generate_recommendations(
+            request.message, 
+            search_result, 
+            request.travel_plan  # 🆕 传递旅行计划
+        ):
+            yield f"data: {json.dumps({'type': 'recommendation_chunk', 'content': chunk})}\n\n"
+        
+        yield f"data: {json.dumps({'type': 'recommendation_end'})}\n\n"
+        
+        # 🆕 发送完整的酒店列表数据（包含URL和图片）
+        hotels_data = search_result.get("hotels", [])
+        yield f"data: {json.dumps({'type': 'hotels_data', 'hotels': hotels_data})}\n\n"
+        
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+    
+    return StreamingResponse(generate_hotel_stream(), media_type="text/event-stream")
+```
+
 ---
 
 ## 数据流设计
@@ -911,6 +1217,63 @@ populateRoutesForMessage(city, coordsMap)
     │               }
     │
     └─→ saveCurrentSession()
+```
+
+### 4. 酒店推荐流程
+
+```
+用户输入 "我想订酒店"
+    │
+    ├─→ 前端：POST /api/hotel-chat (SSE流式)
+    │       Body: {message: "...", travel_plan: {...}}
+    │
+    ├─→ 后端：步骤1 - 意图分析
+    │       ├─→ hotel_agent.analyze_intent()
+    │       ├─→ LLM 分析用户意图和参数
+    │       ├─→ 提取：destination, checkin_date, checkout_date 等
+    │       └─→ SSE 发送：{step: 1, status: 'completed', data: {...}}
+    │
+    ├─→ 后端：步骤2 - 参数验证
+    │       ├─→ 检查必填字段（destination）
+    │       └─→ SSE 发送：{step: 2, status: 'completed'}
+    │
+    ├─→ 后端：步骤3 - 酒店搜索
+    │       ├─→ booking_hotel_search.search_hotel()
+    │       │   ├─→ Playwright 打开 Booking.com
+    │       │   ├─→ 输入搜索条件
+    │       │   ├─→ 提取酒店信息：
+    │       │   │   • name（名称）
+    │       │   │   • url（预订页面URL）🆕
+    │       │   │   • image（酒店图片URL）🆕
+    │       │   │   • price（价格）
+    │       │   │   • score（评分）
+    │       │   │   • location（位置）
+    │       │   │   • facilities（设施）
+    │       │   └─→ 返回前10家酒店
+    │       └─→ SSE 发送：{step: 3, status: 'completed', message: '找到 N 家酒店'}
+    │
+    ├─→ 后端：步骤4 - 生成推荐（流式）
+    │       ├─→ SSE 发送：{type: 'recommendation_start'}
+    │       ├─→ hotel_agent.generate_recommendations()
+    │       │   ├─→ LLM 生成推荐文本
+    │       │   ├─→ 在推荐理由后插入占位符 [HOTEL_CARD:X] 🆕
+    │       │   └─→ 流式输出文本片段
+    │       ├─→ SSE 发送：{type: 'recommendation_chunk', content: "..."}
+    │       ├─→ SSE 发送：{type: 'recommendation_end'}
+    │       └─→ SSE 发送：{type: 'hotels_data', hotels: [...]} 🆕
+    │
+    └─→ 前端：解析和渲染
+            ├─→ 接收推荐文本流
+            ├─→ 接收酒店数据（hotels_data）
+            ├─→ parseTextWithHotelCards() 解析占位符 🆕
+            │   ├─→ 匹配 [HOTEL_CARD:0], [HOTEL_CARD:1] 等
+            │   └─→ 分割为文本段和酒店段
+            └─→ 渲染：
+                ├─→ 文本段：Markdown 渲染
+                └─→ 酒店段：显示酒店卡片
+                    ├─→ 酒店图片
+                    ├─→ 酒店名称、价格、评分
+                    └─→ 预订链接（跳转到 Booking.com）
 ```
 
 ---
@@ -1185,7 +1548,22 @@ class BaiduRoutePlugin(RoutePlugin): pass
 
 ---
 
-**文档版本**：v1.0  
-**最后更新**：2025-11-16  
+**文档版本**：v1.1  
+**最后更新**：2025-11-17  
 **维护者**：AI 旅行助手团队
+
+### 更新日志
+
+#### v1.1 (2025-11-17)
+- 🆕 酒店推荐功能增强：
+  - 添加酒店预订页面URL提取（Playwright 自动化）
+  - 添加酒店图片URL提取
+  - 实现酒店卡片嵌入到推荐文本中（占位符机制）
+  - 支持从旅行计划中提取酒店需求信息
+- 🆕 前端类型安全优化：
+  - 使用 TypeScript 联合类型和类型守卫
+  - 优化酒店卡片渲染逻辑
+- 🆕 用户体验优化：
+  - 移除步骤中JSON数据的显示，界面更简洁
+  - 酒店卡片响应式设计，适配移动端
 
