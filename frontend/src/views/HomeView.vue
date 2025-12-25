@@ -166,35 +166,50 @@ const steps = [
         </div>
 
         <!-- Visual Mockup (Floating Cards) -->
-        <div class="mt-20 relative w-full max-w-5xl mx-auto hidden md:block h-[400px]">
+        <div class="mt-20 relative w-full max-w-6xl mx-auto hidden md:block h-[500px]">
           <!-- Card 1: Chat Interface -->
-          <div class="absolute left-1/2 -translate-x-1/2 top-0 w-[500px] bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 z-20 transform hover:-translate-y-2 transition-transform duration-500">
-            <div class="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
+          <div class="absolute left-1/2 -translate-x-1/2 top-0 w-[560px] bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 z-20 transform hover:-translate-y-2 transition-transform duration-500">
+            <div class="flex items-center gap-2 mb-6 border-b border-slate-50 pb-4">
               <div class="w-3 h-3 rounded-full bg-red-400"></div>
               <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
               <div class="w-3 h-3 rounded-full bg-green-400"></div>
-              <div class="ml-auto text-xs text-slate-400">AI Assistant</div>
+              <div class="ml-auto text-xs text-slate-400 font-medium">AI Assistant</div>
             </div>
-            <div class="space-y-3">
-              <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                  <Plane class="w-4 h-4" />
+            <div class="space-y-4">
+              <div class="flex gap-4">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                  <Plane class="w-5 h-5" />
                 </div>
-                <div class="bg-slate-50 p-3 rounded-2xl rounded-tl-none text-sm text-slate-600 max-w-[80%]">
+                <div class="bg-slate-50 p-4 rounded-2xl rounded-tl-none text-sm text-slate-600 max-w-[80%] leading-relaxed">
                   我想去日本玩 7 天，预算 2 万，喜欢动漫和美食，请帮我规划一下。
                 </div>
               </div>
-              <div class="flex gap-3 flex-row-reverse">
-                 <div class="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white">
-                  <Sparkles class="w-4 h-4" />
+              <div class="flex gap-4 flex-row-reverse">
+                 <div class="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white flex-shrink-0">
+                  <Sparkles class="w-5 h-5" />
                 </div>
-                <div class="bg-blue-50 p-3 rounded-2xl rounded-tr-none text-sm text-slate-800 max-w-[90%] shadow-sm">
-                  <p class="font-medium mb-1">已为您生成日本 7 日游方案 🇯🇵</p>
-                  <ul class="list-disc list-inside space-y-1 text-xs text-slate-600">
-                    <li>Day 1: 东京 - 秋叶原动漫巡礼</li>
-                    <li>Day 2: 筑地市场海鲜 & 浅草寺</li>
-                    <li>Day 3: 新宿 & 涩谷购物</li>
-                    <li>...</li>
+                <div class="bg-blue-50 p-4 rounded-2xl rounded-tr-none text-sm text-slate-800 max-w-[90%] shadow-sm border border-blue-100/50">
+                  <p class="font-bold mb-2 flex items-center gap-2">
+                    <span>已为您生成日本 7 日游方案</span>
+                    <span class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">JP</span>
+                  </p>
+                  <ul class="space-y-2 text-xs text-slate-600">
+                    <li class="flex items-center gap-2">
+                      <div class="w-1 h-1 rounded-full bg-blue-400"></div>
+                      Day 1: 东京 - 秋叶原动漫巡礼
+                    </li>
+                    <li class="flex items-center gap-2">
+                      <div class="w-1 h-1 rounded-full bg-blue-400"></div>
+                      Day 2: 筑地市场海鲜 & 浅草寺
+                    </li>
+                    <li class="flex items-center gap-2">
+                      <div class="w-1 h-1 rounded-full bg-blue-400"></div>
+                      Day 3: 新宿 & 涩谷购物
+                    </li>
+                    <li class="flex items-center gap-2 opacity-50">
+                      <div class="w-1 h-1 rounded-full bg-blue-400"></div>
+                      ...
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -202,37 +217,42 @@ const steps = [
           </div>
 
           <!-- Card 2: Hotel Info (Left) -->
-          <div class="absolute left-0 top-20 w-[280px] bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-10 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
-            <div class="flex gap-3 mb-3">
-              <div class="w-12 h-12 bg-slate-200 rounded-lg overflow-hidden relative">
-                 <Hotel class="w-full h-full p-2 text-slate-400" />
+          <div class="absolute -left-60 top-24 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 p-5 z-10 transform -rotate-6 hover:rotate-0 hover:-translate-y-2 transition-all duration-500">
+            <div class="flex gap-4 mb-4">
+              <div class="w-14 h-14 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center">
+                 <Hotel class="w-7 h-7 text-slate-400" />
               </div>
               <div>
-                <div class="font-bold text-sm">东京安达仕酒店</div>
-                <div class="text-xs text-slate-500">Minato-ku, Tokyo</div>
+                <div class="font-bold text-sm text-slate-900">东京安达仕酒店</div>
+                <div class="text-xs text-slate-500 mt-1">Minato-ku, Tokyo</div>
               </div>
             </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">已预订</span>
-              <span class="text-sm font-bold">¥3,200/晚</span>
+            <div class="flex justify-between items-center pt-3 border-t border-slate-50">
+              <span class="text-xs font-semibold bg-green-50 text-green-600 px-3 py-1 rounded-full flex items-center gap-1">
+                <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                已预订
+              </span>
+              <span class="text-sm font-bold text-slate-900">¥3,200<span class="text-[10px] text-slate-400 font-normal">/晚</span></span>
             </div>
           </div>
 
           <!-- Card 3: Food Info (Right) -->
-          <div class="absolute right-0 top-32 w-[260px] bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-10 transform rotate-3 hover:rotate-0 transition-transform duration-500">
-             <div class="flex items-center gap-3 mb-2">
-               <div class="p-2 bg-orange-100 rounded-lg text-orange-600">
-                 <Utensils class="w-5 h-5" />
+          <div class="absolute -right-60 top-40 w-[280px] bg-white rounded-2xl shadow-2xl border border-slate-100 p-5 z-10 transform rotate-3 hover:rotate-0 hover:-translate-y-2 transition-all duration-500">
+             <div class="flex items-center gap-3 mb-4">
+               <div class="p-2.5 bg-orange-50 rounded-xl text-orange-500">
+                 <Utensils class="w-6 h-6" />
                </div>
-               <div class="font-bold text-sm">推荐餐厅</div>
+               <div class="font-bold text-sm text-slate-900">智能推荐餐厅</div>
              </div>
-             <div class="text-sm text-slate-700 mb-2">数寄屋桥次郎</div>
-             <div class="w-full bg-slate-100 rounded-full h-1.5 mb-1">
-               <div class="bg-orange-400 h-1.5 rounded-full" style="width: 90%"></div>
-             </div>
-             <div class="text-xs text-slate-400 flex justify-between">
-               <span>匹配度</span>
-               <span>98%</span>
+             <div class="text-sm font-medium text-slate-700 mb-3">数寄屋桥次郎 · 银座店</div>
+             <div class="space-y-2">
+               <div class="flex justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                 <span>匹配度</span>
+                 <span class="text-orange-500">98%</span>
+               </div>
+               <div class="w-full bg-slate-100 rounded-full h-2">
+                 <div class="bg-gradient-to-r from-orange-400 to-orange-500 h-2 rounded-full shadow-sm" style="width: 98%"></div>
+               </div>
              </div>
           </div>
         </div>
