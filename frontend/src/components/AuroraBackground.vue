@@ -35,7 +35,7 @@ const computedClass = computed(() => {
         "
       ></div>
     </div>
-    <div class="relative z-10 w-full">
+    <div class="relative z-10 w-full flex flex-col items-center justify-center">
         <slot />
     </div>
   </div>

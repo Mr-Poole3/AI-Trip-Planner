@@ -2,9 +2,10 @@ import os
 import base64
 import json
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -12,9 +13,12 @@ import uvicorn
 import logging
 import asyncio
 from hotel_agent import HotelAgent
-from pydantic import BaseModel
 import urllib.parse
 import urllib.request
+
+# 引入路由和数据库
+from routers import auth, user, llm
+from database.session import engine, Base
 
 # 加载环境变量
 load_dotenv()
@@ -25,6 +29,14 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Chat API", version="1.0.0")
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"Validation error: {exc.errors()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
+
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +45,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 注册路由
+app.include_router(auth.router)
+app.include_router(user.router)
+app.include_router(llm.router)
+
+# 启动事件：创建数据库表
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        # 仅在测试环境使用，生产环境建议使用 Alembic 迁移
+        await conn.run_sync(Base.metadata.create_all)
 
 # 初始化OpenAI客户端
 client = OpenAI(
