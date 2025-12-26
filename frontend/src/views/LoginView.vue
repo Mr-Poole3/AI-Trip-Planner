@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import AuroraBackground from '@/components/AuroraBackground.vue';
@@ -143,6 +143,26 @@ const loading = ref(false);
 const form = reactive({
   email: '',
   password: '',
+});
+
+onMounted(() => {
+  const autoFillData = sessionStorage.getItem('auto_fill_login');
+  if (autoFillData) {
+    try {
+      const { email, password } = JSON.parse(autoFillData);
+      if (email && password) {
+        form.email = email;
+        form.password = password;
+        // 清除存储，防止刷新页面重复自动登录
+        sessionStorage.removeItem('auto_fill_login');
+        // 自动触发登录
+        handleLogin();
+      }
+    } catch (e) {
+      console.error('Auto fill error:', e);
+      sessionStorage.removeItem('auto_fill_login');
+    }
+  }
 });
 
 const handleLogin = async () => {

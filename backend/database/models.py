@@ -15,6 +15,17 @@ class User(Base):
     oauth_id = Column(String(128), nullable=True, index=True)
     last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+class VerificationCode(Base):
+    __tablename__ = "verification_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    code = Column(String(10), nullable=False)
+    type = Column(String(20), default="register") # register, reset_password
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Integer, default=0) # 0: unused, 1: used
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     is_deleted = Column(Integer, default=0)
 

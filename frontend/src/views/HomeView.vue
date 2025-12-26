@@ -91,7 +91,7 @@ const steps = [
         <div class="flex justify-between items-center h-16">
           <!-- Logo -->
           <div class="flex-shrink-0 flex items-center gap-2 cursor-pointer" @click="router.push('/')">
-            <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white">
+            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white">
               <Plane class="w-5 h-5" />
             </div>
             <span class="font-bold text-xl tracking-tight">AI Trip Planner</span>

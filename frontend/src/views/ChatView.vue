@@ -17,8 +17,42 @@
         <div class="header-left">
           <h1>AI 助手</h1>
         </div>
-        <div class="header-actions">
-          <button @click="clearCurrentChat" class="clear-btn">清空对话</button>
+        <div class="header-right">
+          <div class="user-profile-dropdown group relative">
+            <div class="user-avatar-container">
+              <div class="user-avatar">
+                {{ userStore.userInfo?.username?.[0]?.toUpperCase() || 'U' }}
+              </div>
+              <div class="user-info-text">
+                <span class="user-name">{{ userStore.userInfo?.username || '用户' }}</span>
+                <span class="user-role">高级会员</span>
+              </div>
+              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+
+            <!-- Dropdown Menu -->
+            <div class="dropdown-menu">
+              <div class="dropdown-header">
+                <p class="dropdown-user-email">{{ userStore.userInfo?.email }}</p>
+              </div>
+              <div class="dropdown-divider"></div>
+              <router-link to="/" class="dropdown-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+                返回首页
+              </router-link>
+              <button @click="clearCurrentChat" class="dropdown-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 6L9 16l-4-4"></path></svg>
+                清空对话
+              </button>
+              <div class="dropdown-divider"></div>
+              <button @click="handleLogout" class="dropdown-item logout-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                退出登录
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -130,6 +164,17 @@ import type { Message, MessageContent, StepInfo, HotelData, ToolCall, MapData, T
 import ChatSidebar from '@/components/chat/ChatSidebar.vue'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
+
+import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
+
+const userStore = useUserStore()
+const router = useRouter()
+
+const handleLogout = () => {
+  userStore.logout()
+  router.push('/login')
+}
 
 const messages = ref<Message[]>([])
 const inputMessage = ref('')
@@ -1001,42 +1046,199 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 12px 24px;
   background: white;
-  color: #333;
+  border-bottom: 1px solid #f0f0f0;
+  z-index: 50;
 }
 
 .chat-header h1 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-.header-actions {
+.header-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-primary {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+}
+
+.badge-secondary {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #dcfce7;
+}
+
+.header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
-.clear-btn {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  color: #333;
-  padding: 8px 16px;
-  border-radius: 20px;
+/* User Profile Dropdown */
+.user-profile-dropdown {
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
 }
 
-.clear-btn:hover {
-  background: #e9ecef;
+.user-avatar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.user-avatar-container:hover {
+  background: #f8fafc;
+  border-color: #f1f5f9;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.user-info-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.user-role {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.dropdown-icon {
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.user-profile-dropdown:hover .dropdown-icon {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 220px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  padding: 8px;
+}
+
+.user-profile-dropdown:hover .dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.dropdown-header {
+  padding: 12px 16px;
+}
+
+.dropdown-user-email {
+  font-size: 12px;
+  color: #64748b;
+  word-break: break-all;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.dropdown-item svg {
+  width: 18px;
+  height: 18px;
+  color: #64748b;
+}
+
+.logout-btn {
+  color: #ef4444;
+}
+
+.logout-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.logout-btn svg {
+  color: inherit;
 }
 
 /* 草稿进度条样式 - 大厂风格，与页面主题色协调 */

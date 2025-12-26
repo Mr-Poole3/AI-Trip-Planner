@@ -13,6 +13,10 @@ class UserCreate(UserBase):
     confirm_password: str = Field(..., min_length=6, max_length=72)
     captcha: str
 
+class CaptchaSendRequest(BaseModel):
+    email: EmailStr
+    type: str = "register" # register, reset_password
+
 # Properties to receive via API on login
 class UserLogin(BaseModel):
     email: EmailStr

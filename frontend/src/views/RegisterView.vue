@@ -100,15 +100,22 @@
                   class="block w-full pl-11 pr-4 py-2.5 bg-white/50 border border-gray-200 rounded-2xl leading-relaxed text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-200 shadow-sm"
                   id="captcha"
                   type="text"
-                  placeholder="1234"
+                  placeholder="请输入6位验证码"
                   required
                 />
               </div>
-              <div class="flex items-center justify-center px-4 bg-gray-100 rounded-2xl border border-gray-200 text-gray-500 font-mono font-bold tracking-widest select-none">
-                1234
-              </div>
+              <button
+                type="button"
+                @click="handleSendCode"
+                :disabled="isSendingCode || countdown > 0"
+                class="flex items-center justify-center px-4 min-w-[120px] bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 font-semibold text-sm hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <span v-if="isSendingCode">发送中...</span>
+                <span v-else-if="countdown > 0">{{ countdown }}s 后重发</span>
+                <span v-else>获取验证码</span>
+              </button>
             </div>
-            <p class="text-[10px] text-gray-400 mt-1.5 ml-1">请输入右侧显示的测试验证码</p>
+            <p class="text-[10px] text-gray-400 mt-1.5 ml-1">验证码将发送至您的邮箱</p>
           </div>
 
           <!-- Terms -->
@@ -155,14 +162,20 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, onUnmounted } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import AuroraBackground from '@/components/AuroraBackground.vue';
+import request from '@/utils/request';
 
 const userStore = useUserStore();
 const router = useRouter();
 const loading = ref(false);
+
+// 验证码相关状态
+const isSendingCode = ref(false);
+const countdown = ref(0);
+let timer: any = null;
 
 const form = reactive({
   username: '',
@@ -171,6 +184,54 @@ const form = reactive({
   confirm_password: '',
   captcha: '',
 });
+
+// 组件销毁时清理定时器
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+});
+
+// 发送验证码逻辑
+const handleSendCode = async () => {
+  if (!form.email) {
+    alert('请先输入电子邮箱');
+    return;
+  }
+
+  // 简单的邮箱格式校验
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(form.email)) {
+    alert('请输入有效的电子邮箱格式');
+    return;
+  }
+
+  isSendingCode.value = true;
+  try {
+    const res: any = await request.post('/auth/send-code', {
+      email: form.email,
+      type: 'register'
+    });
+
+    // 如果请求成功（request.ts 拦截器会自动抛出非0 code 的错误）
+    alert('验证码已发送，请查收邮件');
+    startCountdown();
+  } catch (e: any) {
+    const errorMsg = e.response?.data?.message || e.message || '发送失败';
+    alert(`发送失败: ${errorMsg}`);
+  } finally {
+    isSendingCode.value = false;
+  }
+};
+
+// 倒计时逻辑
+const startCountdown = () => {
+  countdown.value = 60;
+  timer = setInterval(() => {
+    countdown.value--;
+    if (countdown.value <= 0) {
+      clearInterval(timer);
+    }
+  }, 1000);
+};
 
 const handleRegister = async () => {
   if (form.password !== form.confirm_password) {
@@ -182,7 +243,12 @@ const handleRegister = async () => {
   try {
     const res: any = await userStore.register(form);
     if (res.code === 0) {
-      alert('注册成功，请登录');
+      alert('注册成功！正在跳转登录...');
+      // 存储账号密码供登录页自动填充并登录
+      sessionStorage.setItem('auto_fill_login', JSON.stringify({
+        email: form.email,
+        password: form.password
+      }));
       router.push('/login');
     } else {
       alert(res.message || '注册失败');

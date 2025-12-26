@@ -4,16 +4,21 @@ from sqlalchemy.future import select
 from datetime import datetime, timedelta
 
 from database.session import get_db
-from database.models import User, UserToken, PasswordResetToken
+from database.models import User, UserToken, PasswordResetToken, VerificationCode
 from schemas.auth import (
     UserCreate, UserLogin, Token, TokenRefresh, 
     PasswordResetRequest, PasswordResetConfirm, ChangePassword, 
-    ResponseBase, UserResponse
+    ResponseBase, UserResponse, CaptchaSendRequest
 )
 from core.security import (
     verify_password, get_password_hash, 
     create_access_token, create_refresh_token, decode_token
 )
+from core.email import send_email, send_verification_code_email, send_password_reset_email
+import secrets
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -33,11 +38,63 @@ async def get_current_user(token: str = Depends(decode_token), db: AsyncSession 
 
 # --- Endpoints ---
 
+@router.post("/send-code", response_model=ResponseBase)
+async def send_verification_code(req: CaptchaSendRequest, db: AsyncSession = Depends(get_db)):
+    # 1. 检查发送频率 (例如 60秒内只能发一次)
+    stmt = select(VerificationCode).where(
+        VerificationCode.email == req.email,
+        VerificationCode.type == req.type,
+        VerificationCode.created_at > datetime.utcnow() - timedelta(seconds=60)
+    )
+    result = await db.execute(stmt)
+    if result.scalars().first():
+        return ResponseBase(code=1007, message="please wait before sending again")
+
+    # 2. 生成验证码 (6位数字)
+    code = "".join([str(secrets.randbelow(10)) for _ in range(6)])
+    
+    # 3. 存储验证码
+    db_code = VerificationCode(
+        email=req.email,
+        code=code,
+        type=req.type,
+        expires_at=datetime.utcnow() + timedelta(minutes=5) # 5分钟有效
+    )
+    db.add(db_code)
+    await db.commit()
+    
+    # 4. 发送邮件
+    # 使用后台任务发送邮件可以避免阻塞接口，但为了简单起见，这里直接调用
+    # 如果邮件服务响应慢，建议改为 BackgroundTasks
+    if send_verification_code_email(req.email, code):
+        return ResponseBase(message="code sent")
+    else:
+        # 发送失败，删除刚创建的记录以免影响重试
+        await db.delete(db_code)
+        await db.commit()
+        return ResponseBase(code=5001, message="failed to send email")
+
 @router.post("/register", response_model=ResponseBase)
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    # 1. Verify Captcha (Mock)
-    if user_in.captcha != "1234":
-        return ResponseBase(code=1006, message="invalid captcha")
+    # 1. Verify Captcha
+    stmt = select(VerificationCode).where(
+        VerificationCode.email == user_in.email,
+        VerificationCode.code == user_in.captcha,
+        VerificationCode.type == "register",
+        VerificationCode.used == 0,
+        VerificationCode.expires_at > datetime.utcnow()
+    )
+    result = await db.execute(stmt)
+    code_record = result.scalars().first()
+    
+    if not code_record:
+        # 兼容旧的 Mock 验证码 "1234" (可选，开发阶段方便调试，生产环境应移除)
+        if user_in.captcha != "1234":
+            return ResponseBase(code=1006, message="invalid or expired captcha")
+    else:
+        # 标记验证码已使用
+        code_record.used = 1
+        await db.commit()
     
     # 2. Check Password
     if user_in.password != user_in.confirm_password:
@@ -170,8 +227,9 @@ async def forgot_password(req: PasswordResetRequest, db: AsyncSession = Depends(
         )
         db.add(db_reset)
         await db.commit()
-        # Mock sending email
-        print(f"To: {req.email}, Reset Link: /reset-password?token={reset_token}")
+        
+        # 发送真实邮件
+        send_password_reset_email(req.email, reset_token)
         
     return ResponseBase(message="if email exists, reset link sent")
 
